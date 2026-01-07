@@ -1,0 +1,9 @@
+[package]
+name = "sentiric-sip-uac"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Yerel kütüphaneler (Geliştirme bitince git linkine dönecek)
+sentiric-sip-core = { path = "../sentiric-sip-core" }
+sentiric-rtp-core = { path = "../sentiric-rtp-core" }
