@@ -1,0 +1,60 @@
+name: Build and Publish SIP UAC (Tester)
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout UAC (Ana Repo)
+        uses: actions/checkout@v4
+        with:
+          path: sentiric-sip-uac
+
+      # Bağımlılıkları yan klasörlere çekiyoruz
+      - name: Checkout SIP Core
+        uses: actions/checkout@v4
+        with:
+          repository: sentiric/sentiric-sip-core
+          path: sentiric-sip-core
+
+      - name: Checkout RTP Core
+        uses: actions/checkout@v4
+        with:
+          repository: sentiric/sentiric-rtp-core
+          path: sentiric-rtp-core
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build Context yine en üst dizin (.) olmalı
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: sentiric-sip-uac/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
