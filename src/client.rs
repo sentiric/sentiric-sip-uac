@@ -1,7 +1,8 @@
+// sentiric-sip-uac/src/client.rs
+
 use std::net::UdpSocket;
-use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use sentiric_sip_core::{SipPacket, Method, Header, HeaderName};
 use sentiric_sip_core::parser;
 use sentiric_rtp_core::{G729, Encoder, RtpHeader};
@@ -15,9 +16,13 @@ pub struct Client {
 
 impl Client {
     pub fn new(target_ip: &str, target_port: u16) -> Self {
-        let local_port = 6060; // İstemci 6060'tan çıksın
-        let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_port)).expect("UDP bind hatası");
+        let local_port = 6060;
+        let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_port))
+            .expect("UAC: UDP port 6060 açılamadı. Başka bir test çalışıyor olabilir.");
         
+        // Blocking olmaması için timeout ekleyelim (Test aracı olduğu için)
+        socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+
         Client {
             socket,
             target_ip: target_ip.to_string(),
@@ -27,16 +32,14 @@ impl Client {
     }
 
     pub fn start_call(&self, to_user: &str) {
-        println!("📞 Çağrı başlatılıyor -> {}:{}", self.target_ip, self.target_port);
+        println!("📞 [UAC] Çağrı başlatılıyor -> {}:{}", self.target_ip, self.target_port);
 
-        // 1. INVITE Oluştur
-        let call_id = format!("call-{}@127.0.0.1", 12345); // Rastgele ID
+        let call_id = format!("call-{}@127.0.0.1", 12345);
         let from = format!("<sip:test_uac@127.0.0.1:{}>;tag=client-tag", self.local_port);
         let to = format!("<sip:{}@{}:{}>", to_user, self.target_ip, self.target_port);
         
         let mut invite = SipPacket::new_request(Method::Invite, format!("sip:{}@{}:{}", to_user, self.target_ip, self.target_port));
         
-        // Headerlar
         invite.headers.push(Header::new(HeaderName::Via, format!("SIP/2.0/UDP 127.0.0.1:{};branch=z9hG4bK-uac-1", self.local_port)));
         invite.headers.push(Header::new(HeaderName::From, from.clone()));
         invite.headers.push(Header::new(HeaderName::To, to.clone()));
@@ -46,7 +49,7 @@ impl Client {
         invite.headers.push(Header::new(HeaderName::UserAgent, "Sentiric UAC Tester".to_string()));
         invite.headers.push(Header::new(HeaderName::ContentType, "application/sdp".to_string()));
 
-        // SDP (Basit G.729)
+        // SDP: G.729'u öncelikli yaptık
         let sdp = format!(
             "v=0\r\n\
             o=- 111 111 IN IP4 127.0.0.1\r\n\
@@ -60,43 +63,56 @@ impl Client {
         );
         invite.body = sdp.as_bytes().to_vec();
 
-        // Gönder
         self.send(&invite);
-
-        // Cevap Bekle
         self.listen_loop(call_id, to, from);
     }
 
     fn listen_loop(&self, call_id: String, to_header: String, from_header: String) {
         let mut buf = [0u8; 4096];
+        let start_time = Instant::now();
+
         loop {
+            // 30 saniye içinde cevap gelmezse testi bitir
+            if start_time.elapsed() > Duration::from_secs(30) {
+                println!("❌ [UAC] Timeout: Sunucudan cevap gelmedi.");
+                break;
+            }
+
             if let Ok((size, src)) = self.socket.recv_from(&mut buf) {
                 let data = buf[..size].to_vec();
-                if let Ok(packet) = parser::parse(&data) {
-                    println!("[ALINDI] {} {}", packet.status_code, packet.reason);
+                
+                // Parse işlemi artık SipError döndürüyor, handle ediyoruz
+                match parser::parse(&data) {
+                    Ok(packet) => {
+                        println!("[ALINDI] {} {}", packet.status_code, packet.reason);
 
-                    if packet.status_code == 200 {
-                        // ACK Gönder
-                        println!("✅ 200 OK Alındı. ACK gönderiliyor...");
-                        
-                        let remote_tag = packet.headers.iter()
-                            .find(|h| h.name == HeaderName::To)
-                            .map(|h| h.value.clone())
-                            .unwrap_or(to_header.clone());
+                        if packet.status_code == 200 {
+                            println!("✅ 200 OK Alındı. ACK gönderiliyor...");
+                            
+                            let remote_tag = packet.headers.iter()
+                                .find(|h| h.name == HeaderName::To)
+                                .map(|h| h.value.clone())
+                                .unwrap_or(to_header.clone());
 
-                        let mut ack = SipPacket::new_request(Method::Ack, format!("sip:{}:{}", self.target_ip, self.target_port));
-                        ack.headers.push(Header::new(HeaderName::Via, format!("SIP/2.0/UDP 127.0.0.1:{};branch=z9hG4bK-uac-2", self.local_port)));
-                        ack.headers.push(Header::new(HeaderName::From, from_header.clone()));
-                        ack.headers.push(Header::new(HeaderName::To, remote_tag));
-                        ack.headers.push(Header::new(HeaderName::CallId, call_id.clone()));
-                        ack.headers.push(Header::new(HeaderName::CSeq, "1 ACK".to_string()));
-                        ack.headers.push(Header::new(HeaderName::ContentLength, "0".to_string()));
+                            let mut ack = SipPacket::new_request(Method::Ack, format!("sip:{}:{}", self.target_ip, self.target_port));
+                            ack.headers.push(Header::new(HeaderName::Via, format!("SIP/2.0/UDP 127.0.0.1:{};branch=z9hG4bK-uac-2", self.local_port)));
+                            ack.headers.push(Header::new(HeaderName::From, from_header.clone()));
+                            ack.headers.push(Header::new(HeaderName::To, remote_tag));
+                            ack.headers.push(Header::new(HeaderName::CallId, call_id.clone()));
+                            ack.headers.push(Header::new(HeaderName::CSeq, "1 ACK".to_string()));
+                            ack.headers.push(Header::new(HeaderName::ContentLength, "0".to_string()));
 
-                        self.send(&ack);
+                            self.send(&ack);
 
-                        // RTP Başlat
-                        self.start_rtp(src.ip().to_string(), 10000); // 10000 sunucu RTP portu varsayılan
-                        break;
+                            // Sunucunun RTP'yi beklediği IP'yi öğrenmek için SDP parse edilebilir
+                            // Şimdilik SIP paketinin geldiği IP'ye ve varsayılan porta (10000) atıyoruz.
+                            let rtp_target_ip = src.ip().to_string();
+                            self.start_rtp_precision(rtp_target_ip, 10000); 
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("⚠️ [UAC] Parse Hatası: {}", e);
                     }
                 }
             }
@@ -105,27 +121,49 @@ impl Client {
 
     fn send(&self, pkt: &SipPacket) {
         let bytes = pkt.to_bytes();
-        self.socket.send_to(&bytes, format!("{}:{}", self.target_ip, self.target_port)).unwrap();
+        if let Err(e) = self.socket.send_to(&bytes, format!("{}:{}", self.target_ip, self.target_port)) {
+            eprintln!("❌ [UAC] Gönderim Hatası: {}", e);
+        }
     }
 
-    fn start_rtp(&self, target_ip: String, target_port: u16) {
-        println!("🎵 UAC RTP Yayını Başlıyor -> {}:{}", target_ip, target_port);
+    // YENİ: Precision Timing ile RTP Gönderimi (UAS'taki gibi)
+    fn start_rtp_precision(&self, target_ip: String, target_port: u16) {
+        println!("🎵 [UAC] RTP Yayını Başlıyor -> {}:{}", target_ip, target_port);
         let mut encoder = G729::new();
-        let pcm = vec![0i16; 160];
+        // Sessizlik (Silence) verisi
+        let pcm = vec![0i16; 160]; 
         let mut seq = 0u16;
+        let mut ts = 0u32;
         
-        // 5 Saniye ses gönder
-        for _ in 0..250 {
+        let frame_duration = Duration::from_micros(20000); // 20ms
+        let mut next_wakeup = Instant::now();
+
+        // 10 Saniye boyunca ses gönder (Test süresi)
+        for _ in 0..500 {
             let encoded = encoder.encode(&pcm);
-            let mut header = RtpHeader::new(18, seq, seq as u32 * 160, 0x998877);
+            let mut header = RtpHeader::new(18, seq, ts, 0x998877);
             if seq == 0 { header.marker = true; }
             
             let pkt = sentiric_rtp_core::RtpPacket { header, payload: encoded };
-            self.socket.send_to(&pkt.to_bytes(), format!("{}:{}", target_ip, target_port)).unwrap();
+            
+            let _ = self.socket.send_to(&pkt.to_bytes(), format!("{}:{}", target_ip, target_port));
             
             seq = seq.wrapping_add(1);
-            thread::sleep(Duration::from_millis(20));
+            ts = ts.wrapping_add(160);
+
+            // Precision Wait
+            next_wakeup += frame_duration;
+            let now = Instant::now();
+            if now < next_wakeup {
+                let sleep_dur = next_wakeup - now;
+                if sleep_dur > Duration::from_millis(1) {
+                    thread::sleep(sleep_dur - Duration::from_millis(1));
+                }
+                while Instant::now() < next_wakeup {
+                    std::hint::spin_loop();
+                }
+            }
         }
-        println!("🛑 UAC Test Bitti.");
+        println!("🛑 [UAC] Test Bitti.");
     }
 }
