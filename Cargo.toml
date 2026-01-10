@@ -7,8 +7,7 @@ authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# Yerel kütüphaneler (V1.0.0 sürümleri)
-sentiric-sip-core = { path = "../sentiric-sip-core", version = "1.0.0" }
-sentiric-rtp-core = { path = "../sentiric-rtp-core", version = "1.0.0" }
+# UAC de aynı kararlı çekirdeği kullanmalı.
 
-# Thread yönetimi ve zamanlama için standart kütüphane yeterli.
+sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.0.0" }
+sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.0.0" }

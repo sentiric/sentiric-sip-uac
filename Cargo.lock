@@ -33,6 +33,7 @@ checksum = "c5a2d376baa530d1238d133232d15e239abad80d05838b4b59354e5268af431f"
 [[package]]
 name = "sentiric-rtp-core"
 version = "1.0.0"
+source = "git+https://github.com/sentiric/sentiric-rtp-core.git?tag=v1.0.0#c3eb711747a241c4e61757ad22747b2cc4c4bf8e"
 dependencies = [
  "cc",
  "glob",
@@ -42,6 +43,7 @@ dependencies = [
 [[package]]
 name = "sentiric-sip-core"
 version = "1.0.0"
+source = "git+https://github.com/sentiric/sentiric-sip-core.git?tag=v1.0.0#8f9eb31ee0b55dc494a2a4fbb723c5f71647ab45"
 
 [[package]]
 name = "sentiric-sip-uac"
