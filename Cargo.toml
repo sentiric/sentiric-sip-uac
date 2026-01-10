@@ -1,9 +1,14 @@
 [package]
 name = "sentiric-sip-uac"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+description = "Sentiric SIP User Agent Client."
+authors = ["Sentiric Team"]
+license = "AGPL-3.0"
 
 [dependencies]
-# Yerel kütüphaneler (Geliştirme bitince git linkine dönecek)
-sentiric-sip-core = { path = "../sentiric-sip-core" }
-sentiric-rtp-core = { path = "../sentiric-rtp-core" }
+# Yerel kütüphaneler (V1.0.0 sürümleri)
+sentiric-sip-core = { path = "../sentiric-sip-core", version = "1.0.0" }
+sentiric-rtp-core = { path = "../sentiric-rtp-core", version = "1.0.0" }
+
+# Thread yönetimi ve zamanlama için standart kütüphane yeterli.

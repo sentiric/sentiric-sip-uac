@@ -32,7 +32,7 @@ checksum = "c5a2d376baa530d1238d133232d15e239abad80d05838b4b59354e5268af431f"
 
 [[package]]
 name = "sentiric-rtp-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cc",
  "glob",
@@ -41,11 +41,11 @@ dependencies = [
 
 [[package]]
 name = "sentiric-sip-core"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "sentiric-sip-uac"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "sentiric-rtp-core",
  "sentiric-sip-core",
