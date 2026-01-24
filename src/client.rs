@@ -5,7 +5,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 use sentiric_sip_core::{SipPacket, Method, Header, HeaderName};
 use sentiric_sip_core::parser;
-use sentiric_rtp_core::{G729, Encoder, RtpHeader};
+// DÜZELTME: Kullanılmayan G729Encoder ve Encoder kaldırıldı.
+// Sadece kullanılan RtpHeader ve CodecType kaldı.
+use sentiric_rtp_core::{RtpHeader, CodecType, CodecFactory}; 
 
 pub struct Client {
     socket: UdpSocket,
@@ -18,9 +20,8 @@ impl Client {
     pub fn new(target_ip: &str, target_port: u16) -> Self {
         let local_port = 6060;
         let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_port))
-            .expect("UAC: UDP port 6060 açılamadı. Başka bir test çalışıyor olabilir.");
+            .expect("UAC: UDP port 6060 açılamadı.");
         
-        // Blocking olmaması için timeout ekleyelim (Test aracı olduğu için)
         socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
 
         Client {
@@ -49,7 +50,6 @@ impl Client {
         invite.headers.push(Header::new(HeaderName::UserAgent, "Sentiric UAC Tester".to_string()));
         invite.headers.push(Header::new(HeaderName::ContentType, "application/sdp".to_string()));
 
-        // SDP: G.729'u öncelikli yaptık
         let sdp = format!(
             "v=0\r\n\
             o=- 111 111 IN IP4 127.0.0.1\r\n\
@@ -72,16 +72,14 @@ impl Client {
         let start_time = Instant::now();
 
         loop {
-            // 30 saniye içinde cevap gelmezse testi bitir
             if start_time.elapsed() > Duration::from_secs(30) {
-                println!("❌ [UAC] Timeout: Sunucudan cevap gelmedi.");
+                println!("❌ [UAC] Timeout.");
                 break;
             }
 
             if let Ok((size, src)) = self.socket.recv_from(&mut buf) {
                 let data = buf[..size].to_vec();
                 
-                // Parse işlemi artık SipError döndürüyor, handle ediyoruz
                 match parser::parse(&data) {
                     Ok(packet) => {
                         println!("[ALINDI] {} {}", packet.status_code, packet.reason);
@@ -104,8 +102,6 @@ impl Client {
 
                             self.send(&ack);
 
-                            // Sunucunun RTP'yi beklediği IP'yi öğrenmek için SDP parse edilebilir
-                            // Şimdilik SIP paketinin geldiği IP'ye ve varsayılan porta (10000) atıyoruz.
                             let rtp_target_ip = src.ip().to_string();
                             self.start_rtp_precision(rtp_target_ip, 10000); 
                             break;
@@ -126,19 +122,18 @@ impl Client {
         }
     }
 
-    // YENİ: Precision Timing ile RTP Gönderimi (UAS'taki gibi)
     fn start_rtp_precision(&self, target_ip: String, target_port: u16) {
         println!("🎵 [UAC] RTP Yayını Başlıyor -> {}:{}", target_ip, target_port);
-        let mut encoder = G729::new();
-        // Sessizlik (Silence) verisi
+        // Factory kullanarak encoder oluşturuyoruz
+        let mut encoder = CodecFactory::create_encoder(CodecType::G729);
         let pcm = vec![0i16; 160]; 
+        
         let mut seq = 0u16;
         let mut ts = 0u32;
         
-        let frame_duration = Duration::from_micros(20000); // 20ms
+        let frame_duration = Duration::from_micros(20000); 
         let mut next_wakeup = Instant::now();
 
-        // 10 Saniye boyunca ses gönder (Test süresi)
         for _ in 0..500 {
             let encoded = encoder.encode(&pcm);
             let mut header = RtpHeader::new(18, seq, ts, 0x998877);
@@ -151,7 +146,6 @@ impl Client {
             seq = seq.wrapping_add(1);
             ts = ts.wrapping_add(160);
 
-            // Precision Wait
             next_wakeup += frame_duration;
             let now = Instant::now();
             if now < next_wakeup {
