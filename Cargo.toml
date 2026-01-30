@@ -9,5 +9,5 @@ license = "AGPL-3.0"
 [dependencies]
 # UAC de aynı kararlı çekirdeği kullanmalı.
 
-sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.2.11" }
+sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.2.12" }
 sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.2.0" }
