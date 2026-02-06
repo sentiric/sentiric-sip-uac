@@ -1,13 +1,19 @@
 [package]
 name = "sentiric-sip-uac"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
-description = "Sentiric SIP User Agent Client."
+description = "Sentiric SIP User Agent Client - Precision Tester."
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# UAC de aynı kararlı çekirdeği kullanmalı.
-
-sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.2.12" }
+# GÜNCELLEME: Transaction destekli sürümler
+sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.3.4" }
 sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.2.0" }
+
+# Diğer yardımcılar
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+rand = "0.8"
+anyhow = "1.0"
