@@ -1,6 +1,6 @@
 [package]
 name = "sentiric-sip-uac"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
 description = "Sentiric SIP User Agent Client - v1.15.0 Precision Tester."
 authors = ["Sentiric Team"]
