@@ -1,19 +1,20 @@
 [package]
 name = "sentiric-sip-uac"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
-description = "Sentiric SIP User Agent Client - Precision Tester."
+description = "Sentiric SIP User Agent Client - v1.15.0 Precision Tester."
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# GÜNCELLEME: Transaction destekli sürümler
-sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.3.4" }
-sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.2.0" }
+# --- THE IRON CORE (UPGRADED) ---
+sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.3.0" }
+sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.4.1" }
 
-# Diğer yardımcılar
+# Helper Dependencies
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 rand = "0.8"
 anyhow = "1.0"
+chrono = "0.4"
