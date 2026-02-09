@@ -8,8 +8,9 @@ license = "AGPL-3.0"
 
 [dependencies]
 # --- THE IRON CORE (UPGRADED) ---
-sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.3.0" }
-sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.4.1" }
+sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.3.3" }
+sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.4.2" }
+
 
 # Helper Dependencies
 tokio = { version = "1", features = ["full"] }
