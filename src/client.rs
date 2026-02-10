@@ -3,7 +3,8 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tracing::info;
 use sentiric_sip_core::{SipPacket, Method, Header, HeaderName, parser};
-use sentiric_rtp_core::{RtpHeader, RtpPacket, CodecType, CodecFactory, Pacer, AudioProfile};
+// [CLEANUP]: Unused CodecType import removed.
+use sentiric_rtp_core::{RtpHeader, RtpPacket, CodecFactory, Pacer, AudioProfile};
 use rand::Rng;
 
 pub struct Client {
