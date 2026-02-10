@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     let to_user = args.get(3).map(|s| s.as_str()).unwrap_or("9999");
     let from_user = args.get(4).map(|s| s.as_str()).unwrap_or("905548777858");
 
-    info!("--- 🚀 SENTIRIC SIP UAC v1.15.0 TESTER ---");
+    info!("--- 🚀 SENTIRIC SIP UAC v1.2.2 TESTER ---");
     info!("🎯 Target: {}:{}", target_ip, target_port);
     info!("📞 From: {} -> To: {}", from_user, to_user);
 

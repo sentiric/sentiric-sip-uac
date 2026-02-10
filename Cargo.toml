@@ -1,17 +1,17 @@
 [package]
 name = "sentiric-sip-uac"
-version = "1.2.1"
+version = "1.2.2"
 edition = "2021"
 description = "Sentiric SIP User Agent Client - v1.15.0 Precision Tester."
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# --- THE IRON CORE ---
-sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.3.6" }
+# --- THE IRON CORE (STABLE/UPDATED) ---
+sentiric-rtp-core = { git = "https://github.com/sentiric/sentiric-rtp-core.git", tag = "v1.3.8" }
 sentiric-sip-core = { git = "https://github.com/sentiric/sentiric-sip-core.git", tag = "v1.4.3" }
 
-# Helper Dependencies
+# --- Helper Dependencies (CORRECT SECTION) ---
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"

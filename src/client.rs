@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tracing::info;
 use sentiric_sip_core::{SipPacket, Method, Header, HeaderName, parser};
-use sentiric_rtp_core::{RtpHeader, RtpPacket, CodecType, CodecFactory, Pacer};
+use sentiric_rtp_core::{RtpHeader, RtpPacket, CodecType, CodecFactory, Pacer, AudioProfile};
 use rand::Rng;
 
 pub struct Client {
@@ -39,12 +39,13 @@ impl Client {
         invite.headers.push(Header::new(HeaderName::CSeq, "1 INVITE".to_string()));
         invite.headers.push(Header::new(HeaderName::Contact, format!("<sip:{}@127.0.0.1:{}>", from_user, self.local_port)));
         invite.headers.push(Header::new(HeaderName::ContentType, "application/sdp".to_string()));
-        invite.headers.push(Header::new(HeaderName::UserAgent, "Sentiric-UAC-Tester-v1.2.1".to_string()));
+        invite.headers.push(Header::new(HeaderName::UserAgent, "Sentiric-UAC-Tester-v1.2.2".to_string()));
 
-        let sdp = "v=0\r\no=- 12345 12345 IN IP4 127.0.0.1\r\ns=PrecisionTest\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 6062 RTP/AVP 8 101\r\na=rtpmap:8 PCMA/8000\r\na=rtpmap:101 telephone-event/8000\r\na=sendrecv\r\n";
+        // UAC artık standart PCMU ile teklif yapacak (en güvenli seçenek)
+        let sdp = "v=0\r\no=- 12345 12345 IN IP4 127.0.0.1\r\ns=PrecisionTest\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 6062 RTP/AVP 0 101\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:101 telephone-event/8000\r\na=sendrecv\r\na=ptime:20\r\n";
         invite.body = sdp.as_bytes().to_vec();
 
-        info!("📤 [SIP] Sending INVITE (Identity Restoration Test)");
+        info!("📤 [SIP] Sending INVITE (Testing Iron Core Alignment)");
         self.socket.send_to(&invite.to_bytes(), self.target_addr).await?;
 
         self.wait_for_response(call_id, to, from).await
@@ -56,10 +57,9 @@ impl Client {
             let (size, src) = self.socket.recv_from(&mut buf).await?;
             let packet = parser::parse(&buf[..size])?;
 
-            if packet.status_code == 200 {
-                info!("✅ [SIP] 200 OK Received. Extracting Remote Media Port...");
+            if packet.status_code >= 200 && packet.status_code < 300 {
+                info!("✅ [SIP] {} OK Received. Extracting Remote Media Port...", packet.status_code);
 
-                // Dynamic RTP Port Discovery
                 let sdp_text = String::from_utf8_lossy(&packet.body);
                 let rtp_port = self.extract_rtp_port(&sdp_text).unwrap_or(30000);
                 let rtp_target = SocketAddr::new(self.target_addr.ip(), rtp_port);
@@ -79,8 +79,8 @@ impl Client {
                 info!("🎵 [RTP] Starting Audio Sequence...");
                 self.run_rtp_stream(rtp_target).await?;
                 break;
-            } else if packet.status_code >= 400 {
-                return Err(anyhow::anyhow!("SIP Error: {}", packet.status_code));
+            } else if packet.status_code >= 300 {
+                return Err(anyhow::anyhow!("SIP Error: {} {}", packet.status_code, packet.reason));
             }
         }
         Ok(())
@@ -99,22 +99,25 @@ impl Client {
     }
 
     async fn run_rtp_stream(&self, media_addr: SocketAddr) -> anyhow::Result<()> {
-        let mut encoder = CodecFactory::create_encoder(CodecType::PCMA);
-        let mut pacer = Pacer::new(20);
+        let profile = AudioProfile::default();
+        let codec_type = profile.preferred_audio_codec();
+        let mut encoder = CodecFactory::create_encoder(codec_type);
+        let mut pacer = Pacer::new(profile.ptime as u64);
         let ssrc: u32 = rand::thread_rng().gen();
         let mut seq: u16 = 0;
         let mut ts: u32 = 0;
+        let payload_size = 160; // 20ms @ 8kHz for PCMU/A
 
         for i in 0..500 {
             pacer.wait();
-            let pcm = vec![0i16; 160]; 
+            let pcm = vec![0i16; payload_size]; 
             let payload = encoder.encode(&pcm);
-            let mut header = RtpHeader::new(8, seq, ts, ssrc);
+            let mut header = RtpHeader::new(codec_type as u8, seq, ts, ssrc);
             header.marker = i == 0;
             let rtp_pkt = RtpPacket { header, payload };
             let _ = self.socket.send_to(&rtp_pkt.to_bytes(), media_addr).await;
             seq = seq.wrapping_add(1);
-            ts = ts.wrapping_add(160);
+            ts = ts.wrapping_add(payload_size as u32);
         }
         info!("🏁 [RTP] Sequence finished.");
         Ok(())
