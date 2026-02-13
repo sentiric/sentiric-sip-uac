@@ -2,12 +2,13 @@
 
 use std::env;
 use tokio::sync::mpsc;
-use tracing::{info, warn, error, Level};
-use sentiric_sip_uac_core::{UacClient, UacEvent};
+use tracing::{info, error, Level};
+// YENİ SDK İMPORTLARI
+use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // 1. Logger Kurulumu (Terminale güzel çıktılar için)
+    // 1. Logger Kurulumu
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
@@ -21,39 +22,52 @@ async fn main() -> anyhow::Result<()> {
     let to_user = args.get(3).map(|s| s.as_str()).unwrap_or("9999").to_string();
     let from_user = args.get(4).map(|s| s.as_str()).unwrap_or("cli-tester").to_string();
 
-    info!("--- 🚀 SENTIRIC SIP CLI SHELL v1.3.0 ---");
+    info!("--- 🚀 SENTIRIC SIP CLI SHELL v2.0 (SDK Integration) ---");
     info!("🎯 Target: {}:{}", target_ip, target_port);
     info!("📞 From: {} -> To: {}", from_user, to_user);
 
-    // 3. Olay Kanalı Oluştur (Core -> Shell iletişimi için)
+    // 3. Olay Kanalı Oluştur (SDK -> Shell)
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
-    // 4. Core Client'ı Başlat
-    let client = UacClient::new(tx);
+    // 4. Yeni SDK Client'ı Başlat (TelecomClient)
+    let client = TelecomClient::new(tx);
 
-    // 5. Olay Dinleyici (Event Listener) - Ayrı bir task olarak çalışır
+    // 5. Olay Dinleyici (Event Listener)
     let event_handler = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                UacEvent::Log(msg) => info!("[CORE] {}", msg),
-                UacEvent::Status(msg) => info!("🔔 STATUS: {}", msg),
+                UacEvent::Log(msg) => info!("[SDK] {}", msg),
+                UacEvent::CallStateChanged(state) => {
+                    info!("🔔 STATUS CHANGED: {:?}", state);
+                    if state == CallState::Terminated {
+                        info!("🏁 Call sequence finished.");
+                        // Normalde burada break yapabiliriz ama logları kaçırmamak için biraz bekleyebiliriz.
+                        // Şimdilik CLI mantığı gereği terminated olunca çıkıyoruz.
+                        std::process::exit(0); 
+                    }
+                },
                 UacEvent::Error(err) => error!("❌ ERROR: {}", err),
-                UacEvent::CallEnded => {
-                    info!("🏁 Call sequence finished.");
-                    break;
-                }
             }
         }
     });
 
     // 6. Aramayı Başlat
-    // Not: start_call kendi içinde loop barındırdığı için burası bekleyecektir (blocking).
     if let Err(e) = client.start_call(target_ip, target_port, to_user, from_user).await {
         error!("🔥 Critical Failure: {}", e);
+        std::process::exit(1);
     }
 
-    // Task'ın temizlenmesini bekle
-    let _ = event_handler.await;
+    // CLI'ı açık tutmak için sonsuz döngü veya sinyal bekleme
+    // SDK arka planda çalıştığı için main thread'i bloklamamız lazım.
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("🛑 Stopping call...");
+            let _ = client.end_call().await;
+        }
+        _ = event_handler => {
+            info!("Event handler exited.");
+        }
+    }
 
     Ok(())
 }

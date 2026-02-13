@@ -1,14 +1,14 @@
 [package]
 name = "sentiric-sip-uac"
-version = "1.3.0" # Mimari değişim nedeniyle versiyon yükseltildi
+version = "1.4.0"
 edition = "2021"
-description = "CLI Shell for Sentiric SIP UAC - Powered by uac-core."
+description = "CLI Shell for Sentiric SIP UAC - Powered by Telecom Client SDK."
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# --- THE NEW BRAIN ---
-sentiric-sip-uac-core = { git = "https://github.com/sentiric/sentiric-sip-uac-core.git", branch = "main" }
+# --- THE NEW BRAIN (RENAMED & UPDATED) ---
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", branch = "main" }
 
 # --- Utilities for CLI ---
 tokio = { version = "1", features = ["full"] }
