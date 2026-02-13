@@ -1,71 +1,95 @@
 // sentiric-sip-uac/src/main.rs
 
 use std::env;
+use std::process;
 use tokio::sync::mpsc;
-use tracing::{info, error, Level};
-// YENİ SDK İMPORTLARI
+use tracing::{info, warn, error, Level};
+// SDK Importları
 use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState};
+
+fn print_usage(program_name: &str) {
+    println!("Usage: {} <TARGET_IP> [TARGET_PORT] [TO_USER] [FROM_USER]", program_name);
+    println!("Example:");
+    println!("  {} 34.122.40.122 5060 9999 cli-tester", program_name);
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 1. Logger Kurulumu
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
+        .without_time() // CLI'da daha temiz görünüm için zamanı gizle (Zaten SDK loglarında olabilir)
         .init();
 
-    // 2. CLI Argümanlarını Oku
+    // 2. Argüman Ayrıştırma (Hardcode Önleme)
     let args: Vec<String> = env::args().collect();
-    
-    // Varsayılan değerler
-    let target_ip = args.get(1).map(|s| s.as_str()).unwrap_or("127.0.0.1").to_string();
+    if args.len() < 2 {
+        error!("❌ Missing arguments.");
+        print_usage(&args[0]);
+        process::exit(1);
+    }
+
+    let target_ip = args[1].clone();
     let target_port: u16 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(5060);
-    let to_user = args.get(3).map(|s| s.as_str()).unwrap_or("9999").to_string();
-    let from_user = args.get(4).map(|s| s.as_str()).unwrap_or("cli-tester").to_string();
+    let to_user = args.get(3).cloned().unwrap_or_else(|| "service".to_string());
+    let from_user = args.get(4).cloned().unwrap_or_else(|| "cli-uac".to_string());
 
-    info!("--- 🚀 SENTIRIC SIP CLI SHELL v2.0 (SDK Integration) ---");
-    info!("🎯 Target: {}:{}", target_ip, target_port);
-    info!("📞 From: {} -> To: {}", from_user, to_user);
+    info!("==========================================");
+    info!("🚀 SENTIRIC SIP UAC v2.0 (Active)");
+    info!("==========================================");
+    info!("🎯 Target : {}:{}", target_ip, target_port);
+    info!("📞 Call   : {} -> {}", from_user, to_user);
+    info!("------------------------------------------");
 
-    // 3. Olay Kanalı Oluştur (SDK -> Shell)
+    // 3. Kanal Kurulumu (SDK -> CLI)
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
-    // 4. Yeni SDK Client'ı Başlat (TelecomClient)
+    // 4. SDK Motorunu Başlat
+    info!("⚙️  Initializing Telecom Engine...");
     let client = TelecomClient::new(tx);
 
-    // 5. Olay Dinleyici (Event Listener)
+    // 5. Olay Dinleyici (Background Task)
     let event_handler = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                UacEvent::Log(msg) => info!("[SDK] {}", msg),
+                // SDK'dan gelen detaylı loglar (SIP Paketleri dahil)
+                UacEvent::Log(msg) => {
+                    println!("{}", msg); // Tracing yerine direkt stdout'a bas (Log kirliliğini önlemek için)
+                }
+                // Çağrı Durum Değişiklikleri
                 UacEvent::CallStateChanged(state) => {
-                    info!("🔔 STATUS CHANGED: {:?}", state);
+                    info!("🔔 CALL STATE: {:?}", state);
                     if state == CallState::Terminated {
-                        info!("🏁 Call sequence finished.");
-                        // Normalde burada break yapabiliriz ama logları kaçırmamak için biraz bekleyebiliriz.
-                        // Şimdilik CLI mantığı gereği terminated olunca çıkıyoruz.
-                        std::process::exit(0); 
+                        info!("🏁 Call Terminated. Exiting...");
+                        process::exit(0);
                     }
-                },
-                UacEvent::Error(err) => error!("❌ ERROR: {}", err),
+                }
+                // Kritik Hatalar
+                UacEvent::Error(err) => {
+                    error!("❌ SDK ERROR: {}", err);
+                    process::exit(1);
+                }
             }
         }
     });
 
     // 6. Aramayı Başlat
+    info!("🚀 Dialing...");
     if let Err(e) = client.start_call(target_ip, target_port, to_user, from_user).await {
-        error!("🔥 Critical Failure: {}", e);
-        std::process::exit(1);
+        error!("🔥 Failed to start call: {}", e);
+        process::exit(1);
     }
 
-    // CLI'ı açık tutmak için sonsuz döngü veya sinyal bekleme
-    // SDK arka planda çalıştığı için main thread'i bloklamamız lazım.
+    // 7. Kapanış Sinyali Bekleme (Ctrl+C)
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
-            info!("🛑 Stopping call...");
+            warn!("🛑 User interrupted. Sending BYE...");
             let _ = client.end_call().await;
+            // BYE gönderimi için kısa bir süre bekle
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
         _ = event_handler => {
-            info!("Event handler exited.");
+            // Event loop biterse çık
         }
     }
 

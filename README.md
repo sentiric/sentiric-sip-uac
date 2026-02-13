@@ -1,38 +1,57 @@
-# Sentiric SIP UAC (User Agent Client)
+# 📞 Sentiric SIP UAC (CLI)
 
-Sentiric SIP Sunucularını (UAS) test etmek, yük testi uygulamak ve doğrulama yapmak için geliştirilmiş **Test İstemcisidir**.
+Sentiric platformunu test etmek için geliştirilmiş, komut satırı tabanlı, **Stateful** bir SIP istemcisidir.
 
-Bir operatör (Softswitch) veya IP Telefon gibi davranarak sunucuya çağrı başlatır.
+Gücünü `sentiric-telecom-client-sdk` motorundan alır.
 
-## 🎯 Amaç
+## 🚀 Özellikler
 
-*   **Doğrulama:** Sunucunun `INVITE`, `200 OK` ve `ACK` döngüsünü (3-Way Handshake) doğru tamamladığını test eder.
-*   **Ses Testi:** Sunucunun gönderdiği RTP paketlerini karşılar ve kendisi de RTP gönderir.
-*   **Operatör Simülasyonu:** Gerçek bir operatöre bağlanmadan önce yerel ağda (Localhost) geliştirme yapmayı sağlar.
+*   **RFC 3261 Uyumu:** `INVITE`, `200 OK`, `ACK`, `BYE` akışını tam yönetir.
+*   **Auto-ACK:** Sunucudan `200 OK` geldiğinde otomatik olarak `ACK` gönderir.
+*   **RTP Latching:** SDP içindeki IP/Port bilgisini analiz eder ve medyayı doğru hedefe kilitler.
+*   **Retransmission:** UDP paket kayıplarına karşı tekrar gönderim (Timer A) yapar.
+*   **Derinlemesine Loglama:** Giden ve gelen tüm SIP paketlerini konsola basar.
 
-## 🚀 Kullanım
-
-Test edilecek sunucunun IP adresini parametre olarak verin.
+## 🛠️ Kurulum ve Derleme
 
 ```bash
-# Localhost testi
-cargo run --release -- 127.0.0.1
-
-# Uzak sunucu testi
-cargo run --release -- 192.168.1.100
+# Release modunda derle (Performans için)
+cargo build --release
 ```
 
-## 📋 Test Senaryosu
+## 💻 Kullanım
 
-Bu araç çalıştığında sırasıyla şunları yapar:
-1.  **INVITE:** Hedef sunucuya çağrı başlatır (G.729/PCMA SDP ile).
-2.  **Wait:** `100 Trying` ve `180 Ringing` (varsa) mesajlarını karşılar.
-3.  **200 OK:** Sunucu cevap verdiğinde SDP'yi analiz eder.
-4.  **ACK:** El sıkışmayı tamamlar.
-5.  **RTP:** Belirlenen port üzerinden ses akışını (Dummy Stream) başlatır.
+Aracı çalıştırmak için hedef IP adresi zorunludur. Diğer parametreler opsiyoneldir.
 
-## 🔧 Teknik Detaylar
+```bash
+# Temel Kullanım (Varsayılan: Port 5060, Hedef: service, Kaynak: cli-uac)
+./target/release/sentiric-sip-uac <HEDEF_IP>
 
-*   **Port:** 6060 (Çakışmayı önlemek için 5060 kullanmaz).
-*   **User-Agent:** `Sentiric UAC Tester`
-*   **Bağımlılıklar:** `sip-core` ve `rtp-core`.
+# Tam Kullanım
+./target/release/sentiric-sip-uac <HEDEF_IP> <PORT> <ARANAN_NO> <ARAYAN_NO>
+```
+
+### Örnekler
+
+**1. SBC'ye Doğrudan Arama (Echo Test):**
+```bash
+# 9999 numarası genellikle Echo Testidir.
+cargo run --release -- 34.122.40.122 5060 9999 my-tester
+```
+
+**2. B2BUA Üzerinden Arama:**
+```bash
+cargo run --release -- 10.0.0.5 5060 1001 admin
+```
+
+## 🔍 Beklenen Çıktı
+
+Başarılı bir testte şunları görmelisiniz:
+
+1.  `📤 OUTGOING INVITE`: Oluşturulan SIP paketi.
+2.  `📥 INCOMING PACKET`: Sunucudan gelen `100 Trying` ve `180 Ringing`.
+3.  `🔔 CALL STATE: Connected`: `200 OK` alındı.
+4.  `--> AUTO-ACK Sent`: El sıkışma tamamlandı.
+5.  `⌨️ [DTMF]`: (Eğer tuşlama yaparsanız)
+
+---
