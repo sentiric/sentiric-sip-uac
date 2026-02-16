@@ -18,10 +18,10 @@ async fn main() -> anyhow::Result<()> {
     // 1. Logger Kurulumu
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
-        .without_time() // CLI'da daha temiz görünüm için zamanı gizle
+        .without_time() 
         .init();
 
-    // 2. Argüman Ayrıştırma (Hardcode Önleme)
+    // 2. Argüman Ayrıştırma
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         error!("❌ Missing arguments.");
@@ -41,23 +41,21 @@ async fn main() -> anyhow::Result<()> {
     info!("📞 Call   : {} -> {}", from_user, to_user);
     info!("------------------------------------------");
 
-    // 3. Kanal Kurulumu (SDK -> CLI)
-    // _rx hatasını önlemek için değişkeni kullanıyoruz
+    // 3. Kanal Kurulumu
+    // _rx warning'ini engellemek için kullanıyoruz
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
     // 4. SDK Motorunu Başlat
     info!("⚙️  Initializing Telecom Engine...");
     let client = TelecomClient::new(tx);
 
-    // 5. Olay Dinleyici (Background Task)
+    // 5. Olay Dinleyici
     let event_handler = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                // SDK'dan gelen detaylı loglar (SIP Paketleri dahil)
                 UacEvent::Log(msg) => {
                     println!("{}", msg); 
                 }
-                // Çağrı Durum Değişiklikleri
                 UacEvent::CallStateChanged(state) => {
                     info!("🔔 CALL STATE: {:?}", state);
                     if state == CallState::Terminated {
@@ -65,22 +63,20 @@ async fn main() -> anyhow::Result<()> {
                         process::exit(0);
                     }
                 }
-                // Medya Akışı Başladı
-                UacEvent::MediaActive => {
-                    info!("🎙️  MEDIA ACTIVE: 2-Way Audio Established!");
-                }
-                // RTP İstatistikleri
-                UacEvent::RtpStats { rx_cnt, tx_cnt } => {
-                    // Sürekli log basmamak için sadece her 10 pakette bir veya ilk pakette bilgi verilebilir
-                    // Ancak CLI olduğu için debug amaçlı her seferinde basabiliriz veya sessize alabiliriz.
-                    if rx_cnt % 50 == 0 || tx_cnt % 50 == 0 {
-                        info!("📊 RTP Stats: RX={} TX={}", rx_cnt, tx_cnt);
-                    }
-                }
-                // Kritik Hatalar
                 UacEvent::Error(err) => {
                     error!("❌ SDK ERROR: {}", err);
                     process::exit(1);
+                }
+                // [FIX]: Eksik kollar eklendi
+                UacEvent::MediaActive => {
+                    info!("🎙️  MEDIA ACTIVE: 2-Way Audio Established!");
+                }
+                UacEvent::RtpStats { rx_cnt, tx_cnt } => {
+                     // İstatistikleri çok sık basmamak için debug seviyesinde tutabiliriz
+                     // veya belirli aralıklarla basabiliriz.
+                     if rx_cnt % 50 == 0 {
+                         info!("📊 RTP Stats: RX={} TX={}", rx_cnt, tx_cnt);
+                     }
                 }
             }
         }
@@ -93,17 +89,14 @@ async fn main() -> anyhow::Result<()> {
         process::exit(1);
     }
 
-    // 7. Kapanış Sinyali Bekleme (Ctrl+C)
+    // 7. Kapanış Sinyali Bekleme
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
             warn!("🛑 User interrupted. Sending BYE...");
             let _ = client.end_call().await;
-            // BYE gönderimi için kısa bir süre bekle
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
-        _ = event_handler => {
-            // Event loop biterse çık
-        }
+        _ = event_handler => {}
     }
 
     Ok(())
