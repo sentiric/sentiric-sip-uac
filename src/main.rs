@@ -18,10 +18,10 @@ async fn main() -> anyhow::Result<()> {
     // 1. Logger Kurulumu
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
-        .without_time() 
+        .without_time() // CLI'da daha temiz görünüm için zamanı gizle
         .init();
 
-    // 2. Argüman Ayrıştırma
+    // 2. Argüman Ayrıştırma (Hardcode Önleme)
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         error!("❌ Missing arguments.");
@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     info!("📞 Call   : {} -> {}", from_user, to_user);
     info!("------------------------------------------");
 
-    // 3. Kanal Kurulumu
+    // 3. Kanal Kurulumu (SDK -> CLI)
     // _rx warning'ini engellemek için kullanıyoruz
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
@@ -49,13 +49,15 @@ async fn main() -> anyhow::Result<()> {
     info!("⚙️  Initializing Telecom Engine...");
     let client = TelecomClient::new(tx);
 
-    // 5. Olay Dinleyici
+    // 5. Olay Dinleyici (Background Task)
     let event_handler = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
+                // SDK'dan gelen detaylı loglar (SIP Paketleri dahil)
                 UacEvent::Log(msg) => {
                     println!("{}", msg); 
                 }
+                // Çağrı Durum Değişiklikleri
                 UacEvent::CallStateChanged(state) => {
                     info!("🔔 CALL STATE: {:?}", state);
                     if state == CallState::Terminated {
@@ -67,13 +69,12 @@ async fn main() -> anyhow::Result<()> {
                     error!("❌ SDK ERROR: {}", err);
                     process::exit(1);
                 }
-                // [FIX]: Eksik kollar eklendi
+                // [FIX]: Eksik kollar eklendi (Build hatasını çözen kısım)
                 UacEvent::MediaActive => {
                     info!("🎙️  MEDIA ACTIVE: 2-Way Audio Established!");
                 }
                 UacEvent::RtpStats { rx_cnt, tx_cnt } => {
                      // İstatistikleri çok sık basmamak için debug seviyesinde tutabiliriz
-                     // veya belirli aralıklarla basabiliriz.
                      if rx_cnt % 50 == 0 {
                          info!("📊 RTP Stats: RX={} TX={}", rx_cnt, tx_cnt);
                      }
