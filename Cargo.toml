@@ -1,15 +1,13 @@
 [package]
 name = "sentiric-sip-uac"
-version = "2.0.0" # Major sürüm: Yeni SDK Mimarisi
+version = "2.1.0"
 edition = "2021"
 description = "CLI Shell for Sentiric SIP UAC - Powered by Telecom Client SDK."
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# --- THE NEW ENGINE ---
-# Standart gereği Git referansını kullanıyoruz.
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", branch = "main" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.2.5" }
 
 # --- Utilities ---
 tokio = { version = "1", features = ["full"] }

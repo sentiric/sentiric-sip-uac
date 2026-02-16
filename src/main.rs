@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     // 1. Logger Kurulumu
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
-        .without_time() // CLI'da daha temiz görünüm için zamanı gizle (Zaten SDK loglarında olabilir)
+        .without_time() // CLI'da daha temiz görünüm için zamanı gizle
         .init();
 
     // 2. Argüman Ayrıştırma (Hardcode Önleme)
@@ -35,13 +35,14 @@ async fn main() -> anyhow::Result<()> {
     let from_user = args.get(4).cloned().unwrap_or_else(|| "cli-uac".to_string());
 
     info!("==========================================");
-    info!("🚀 SENTIRIC SIP UAC v2.0 (Active)");
+    info!("🚀 SENTIRIC SIP UAC v2.1 (Resilient)");
     info!("==========================================");
     info!("🎯 Target : {}:{}", target_ip, target_port);
     info!("📞 Call   : {} -> {}", from_user, to_user);
     info!("------------------------------------------");
 
     // 3. Kanal Kurulumu (SDK -> CLI)
+    // _rx hatasını önlemek için değişkeni kullanıyoruz
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
     // 4. SDK Motorunu Başlat
@@ -54,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
             match event {
                 // SDK'dan gelen detaylı loglar (SIP Paketleri dahil)
                 UacEvent::Log(msg) => {
-                    println!("{}", msg); // Tracing yerine direkt stdout'a bas (Log kirliliğini önlemek için)
+                    println!("{}", msg); 
                 }
                 // Çağrı Durum Değişiklikleri
                 UacEvent::CallStateChanged(state) => {
@@ -62,6 +63,18 @@ async fn main() -> anyhow::Result<()> {
                     if state == CallState::Terminated {
                         info!("🏁 Call Terminated. Exiting...");
                         process::exit(0);
+                    }
+                }
+                // Medya Akışı Başladı
+                UacEvent::MediaActive => {
+                    info!("🎙️  MEDIA ACTIVE: 2-Way Audio Established!");
+                }
+                // RTP İstatistikleri
+                UacEvent::RtpStats { rx_cnt, tx_cnt } => {
+                    // Sürekli log basmamak için sadece her 10 pakette bir veya ilk pakette bilgi verilebilir
+                    // Ancak CLI olduğu için debug amaçlı her seferinde basabiliriz veya sessize alabiliriz.
+                    if rx_cnt % 50 == 0 || tx_cnt % 50 == 0 {
+                        info!("📊 RTP Stats: RX={} TX={}", rx_cnt, tx_cnt);
                     }
                 }
                 // Kritik Hatalar
