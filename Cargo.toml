@@ -7,7 +7,7 @@ authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.2.6" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.2.7" }
 
 # --- Utilities ---
 tokio = { version = "1", features = ["full"] }
