@@ -1,13 +1,13 @@
 [package]
 name = "mobile_uac"
-version = "0.2.0" # SDK v2 uyumu için artış
+version = "0.2.1"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.2.8" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.2.9" }
 
 # Bridge ve Utils
 flutter_rust_bridge = "=2.11.1"
