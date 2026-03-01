@@ -38,6 +38,8 @@ dependencies:
 
   # YENİ: İzin yönetimi için
   permission_handler: ^11.3.1  
+  rename_app: ^1.6.5
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -91,3 +93,8 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
