@@ -27,18 +27,16 @@ pub async fn start_sip_call(
     
     // 1. Loglama (Başlangıç)
     info!("🚀 Mobile Dialing: {} -> {}:{}", from_user, target_ip, target_port);
-    // UI'a da bilgi verelim
     let _ = sink.add(format!("Log(\"🚀 Starting Engine for {}:{}...\")", target_ip, target_port));
 
     // 2. Kanal Kurulumu (SDK -> Flutter Bridge)
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
     
     // 3. SDK Motorunu Başlat
-    let client = TelecomClient::new(tx);
+    // [KRİTİK GÜNCELLEME]: Headless = false (Mobil cihazda donanım var)
+    let client = TelecomClient::new(tx, false);
 
     // 4. Olay Dinleme Döngüsü (Event Loop)
-    // [FIX]: sink nesnesini klonlayarak closure içine taşıyoruz.
-    // Orijinal sink nesnesi hata durumunda kullanılmak üzere dışarıda kalıyor.
     let stream_sink = sink.clone(); 
 
     tokio::spawn(async move {
@@ -67,7 +65,6 @@ pub async fn start_sip_call(
     if let Err(e) = client.start_call(target_ip, target_port, to_user, from_user).await {
         let err_msg = format!("Error(\"Init Failed: {}\")", e);
         info!("❌ {}", err_msg);
-        // Orijinal sink burada kullanılıyor
         let _ = sink.add(err_msg);
         return Err(e);
     }
