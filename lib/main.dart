@@ -1,4 +1,4 @@
-// lib/main.dart
+// sentiric-sip-mobile-uac/lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -35,7 +35,7 @@ class SentiricApp extends StatelessWidget {
       title: 'Sentiric Mobile',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050505), // Derin Siyah
+        scaffoldBackgroundColor: const Color(0xFF050505),
         primaryColor: const Color(0xFF00FF9D),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF00FF9D),
@@ -55,18 +55,16 @@ class DialerScreen extends StatefulWidget {
 }
 
 class _DialerScreenState extends State<DialerScreen> {
-  // Varsayılan Test Değerleri
   final TextEditingController _ipController = TextEditingController(text: "34.122.40.122");
   final TextEditingController _portController = TextEditingController(text: "5060");
-  final TextEditingController _toController = TextEditingController(text: "9999"); // Echo Test
+  final TextEditingController _toController = TextEditingController(text: "9999");
   final TextEditingController _fromController = TextEditingController(text: "mobile-uac");
 
   final List<TelemetryEntry> _telemetryLogs = [];
   final ScrollController _scrollController = ScrollController();
   
-  // Canlı Durum Değişkenleri
   bool _isCalling = false;
-  bool _isMediaFlowing = false; // Gerçek ses akışı var mı?
+  bool _isMediaFlowing = false;
   int _rxPackets = 0;
   int _txPackets = 0;
   String _sipStatus = "IDLE";
@@ -77,14 +75,11 @@ class _DialerScreenState extends State<DialerScreen> {
     final entry = TelecomTelemetry.parse(raw);
 
     setState(() {
-      // 1. İstatistik Güncellemesi (Log basma, sadece sayacı güncelle)
       if (entry.level == TelemetryLevel.media && entry.rxCount != null) {
         _rxPackets = entry.rxCount!;
         _txPackets = entry.txCount!;
-        // Eğer paket geliyorsa media aktiftir
         if (_rxPackets > 5) _isMediaFlowing = true;
       } 
-      // 2. Durum Güncellemesi
       else if (entry.message.contains("SIP STATE:")) {
         _sipStatus = entry.message.split(":").last.trim().toUpperCase();
         if (_sipStatus == "TERMINATED") {
@@ -93,7 +88,6 @@ class _DialerScreenState extends State<DialerScreen> {
         }
         _addLog(entry);
       }
-      // 3. Normal Log
       else {
         _addLog(entry);
       }
@@ -102,7 +96,6 @@ class _DialerScreenState extends State<DialerScreen> {
 
   void _addLog(TelemetryEntry entry) {
     _telemetryLogs.add(entry);
-    // Otomatik Scroll
     if (_scrollController.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollController.animateTo(
@@ -116,11 +109,6 @@ class _DialerScreenState extends State<DialerScreen> {
 
   Future<void> _toggleCall() async {
     if (_isCalling) {
-      // Bitir
-      // Not: SDK'nın end_call metodunu çağırmak için Rust API'sine export eklememiştik.
-      // Şimdilik sadece UI reset yapıyoruz, gerçek uygulamada end_call çağrılmalı.
-      // Ancak "Strict" moda göre eksik bırakmamalıyız. 
-      // Şimdilik "Yeniden Başlat" mantığıyla çalışsın.
       setState(() {
         _isCalling = false;
         _isMediaFlowing = false;
@@ -129,7 +117,14 @@ class _DialerScreenState extends State<DialerScreen> {
       return;
     }
 
-    if (await Permission.microphone.request().isGranted) {
+    // [KRİTİK DÜZELTME]: Mikrofon iznini garanti altına alıyoruz.
+    PermissionStatus status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      _addLog(TelemetryEntry(message: "Requesting Microphone Permission...", level: TelemetryLevel.info));
+      status = await Permission.microphone.request();
+    }
+
+    if (status.isGranted) {
       setState(() {
         _telemetryLogs.clear();
         _isCalling = true;
@@ -160,7 +155,7 @@ class _DialerScreenState extends State<DialerScreen> {
         setState(() => _isCalling = false);
       }
     } else {
-      _addLog(TelemetryEntry(message: "MIC PERMISSION DENIED", level: TelemetryLevel.error));
+      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED BY USER", level: TelemetryLevel.error));
     }
   }
 
@@ -168,7 +163,7 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SENTIRIC FIELD MONITOR v2.5', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        title: const Text('SENTIRIC FIELD MONITOR v2.6', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
