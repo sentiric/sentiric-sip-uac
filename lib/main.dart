@@ -107,12 +107,16 @@ class _DialerScreenState extends State<DialerScreen> {
     }
   }
 
+  // _toggleCall içindeki Zombi Çağrı hatasını çözen blok:
   Future<void> _toggleCall() async {
     if (_isCalling) {
+      // [KRİTİK FIX]: Rust API üzerinden gerçek bir BYE gönder ve motoru kapat!
+      await endSipCall();
+      
       setState(() {
         _isCalling = false;
         _isMediaFlowing = false;
-        _sipStatus = "IDLE";
+        _sipStatus = "TERMINATING...";
       });
       return;
     }

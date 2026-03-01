@@ -1,14 +1,14 @@
 [package]
 name = "mobile_uac"
-version = "0.2.2" # BUMP VERSION
+version = "0.2.4"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-# SDK v0.3.0'a yükseltildi
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.4" }
+# YENİ SDK
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.5" }
 
 # Bridge ve Utils
 flutter_rust_bridge = "=2.11.1"
@@ -17,3 +17,8 @@ anyhow = "1.0"
 tracing = "0.1"
 android_logger = "0.13"
 log = "0.4"
+lazy_static = "1.4" # YENİ (Global state için)
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context = "0.1.1"
+jni = "0.21.1"

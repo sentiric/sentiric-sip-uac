@@ -1,12 +1,28 @@
 // sentiric-sip-mobile-uac/rust/src/api/simple.rs
 
-use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState};
+use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState, ClientCommand};
 use crate::frb_generated::StreamSink;
 use log::{info, LevelFilter};
 use android_logger::Config;
 use tokio::sync::mpsc;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
 
-/// Uygulama ilk açıldığında Rust loglarını Android sistemine bağlar.
+// [YENİ]: Flutter'dan her an "Durdur" komutu gönderebilmek için Global Sender.
+lazy_static! {
+    static ref CMD_TX: Mutex<Option<mpsc::Sender<ClientCommand>>> = Mutex::new(None);
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn JNI_OnLoad(vm: jni::JavaVM, _res: *mut std::ffi::c_void) -> jni::sys::jint {
+    let vm = vm.get_java_vm_pointer() as *mut std::ffi::c_void;
+    unsafe {
+        ndk_context::initialize_android_context(vm, std::ptr::null_mut());
+    }
+    jni::sys::JNI_VERSION_1_6
+}
+
 pub fn init_logger() {
     android_logger::init_once(
         Config::default()
@@ -16,7 +32,18 @@ pub fn init_logger() {
     info!("✅ Mobile Logger Initialized via SDK v2.0");
 }
 
-/// SIP çağrısını başlatır ve olayları Flutter UI'a anlık olarak stream eder.
+/// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
+pub async fn end_sip_call() -> anyhow::Result<()> {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        info!("🛑 Flutter UI requested call termination. Sending BYE...");
+        let _ = tx.send(ClientCommand::EndCall).await;
+    } else {
+        info!("⚠️ No active call to terminate.");
+    }
+    Ok(())
+}
+
 pub async fn start_sip_call(
     target_ip: String,
     target_port: u16,
@@ -25,48 +52,46 @@ pub async fn start_sip_call(
     sink: StreamSink<String>, 
 ) -> anyhow::Result<()> {
     
-    // 1. Loglama (Başlangıç)
     info!("🚀 Mobile Dialing: {} -> {}:{}", from_user, target_ip, target_port);
     let _ = sink.add(format!("Log(\"🚀 Starting Engine for {}:{}...\")", target_ip, target_port));
 
-    // 2. Kanal Kurulumu (SDK -> Flutter Bridge)
-    let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
+    let (event_tx, mut event_rx) = mpsc::channel::<UacEvent>(100);
+    let (cmd_tx, cmd_rx) = mpsc::channel::<ClientCommand>(32);
     
-    // 3. SDK Motorunu Başlat
-    // [KRİTİK GÜNCELLEME]: Headless = false (Mobil cihazda donanım var)
-    let client = TelecomClient::new(tx, false);
+    // Global referansı güncelle (Dışarıdan kapatabilmek için)
+    *CMD_TX.lock().unwrap() = Some(cmd_tx.clone());
 
-    // 4. Olay Dinleme Döngüsü (Event Loop)
+    // Motoru manuel başlatıyoruz (TelecomClient::new yerine Engine'i direkt kurarak komut kanalını kontrol edeceğiz)
+    tokio::spawn(async move {
+        let mut engine = sentiric_telecom_client_sdk::engine::SipEngine::new(event_tx, cmd_rx, false).await;
+        engine.run().await;
+    });
+
     let stream_sink = sink.clone(); 
 
     tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            // Rust Enum -> Debug String dönüşümü (Örn: CallStateChanged(Connected))
+        while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);
-            
-            // Android Logcat'e bas
             info!("[SDK-EVENT] {}", msg);
             
-            // Flutter UI'a gönder (Klonlanmış sink üzerinden)
             if stream_sink.add(msg).is_err() {
-                info!("⚠️ Flutter stream closed, stopping listener.");
                 break;
             }
 
-            // Eğer çağrı bittiyse loop'u sonlandırabiliriz.
             if let UacEvent::CallStateChanged(CallState::Terminated) = event {
-                // Opsiyonel: Stream'i kapatmak için break;
+                // Çağrı bittiğinde global kanalı temizle
+                *CMD_TX.lock().unwrap() = None;
+                break;
             }
         }
     });
 
-    // 5. Çağrıyı Başlat (Asenkron)
-    // Hata olursa hemen yakalayıp Flutter'a bildiriyoruz.
-    if let Err(e) = client.start_call(target_ip, target_port, to_user, from_user).await {
-        let err_msg = format!("Error(\"Init Failed: {}\")", e);
+    // Başlatma Komutunu Gönder
+    if cmd_tx.send(ClientCommand::StartCall { target_ip, target_port, to_user, from_user }).await.is_err() {
+        let err_msg = "Error(\"Init Failed: Engine unreachable\")".to_string();
         info!("❌ {}", err_msg);
         let _ = sink.add(err_msg);
-        return Err(e);
+        return Err(anyhow::anyhow!("Engine unreachable"));
     }
     
     Ok(())
