@@ -1,16 +1,15 @@
 [package]
 name = "sentiric-sip-uac"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
-description = "CLI Shell for Sentiric SIP UAC - Powered by Telecom Client SDK v0.3.0"
+description = "CLI Shell for Sentiric SIP UAC - Powered by Telecom Client SDK v0.3.8"
 authors = ["Sentiric Team"]
 license = "AGPL-3.0"
 
 [dependencies]
-# SDK v0.3.0'a yükseltildi (Headless Mode Support)
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.8" }
+# SDK v0.3.8 (SUTS v4 Telemetry & Audio Fixes)
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.9" }
 
-# --- Utilities ---
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
