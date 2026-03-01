@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audio_session/audio_session.dart'; // YENİ: Ses yönlendirmesi için
 import 'package:sentiric_sip_mobile_uac/src/rust/api/simple.dart';
 import 'package:sentiric_sip_mobile_uac/src/rust/frb_generated.dart';
 import 'package:sentiric_sip_mobile_uac/telecom_telemetry.dart';
@@ -33,7 +34,7 @@ class SentiricApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'UAC',
+      title: 'Sentiric Field UAC',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF09090B),
@@ -67,14 +68,41 @@ class _DialerScreenState extends State<DialerScreen> {
   bool _isCalling = false;
   bool _isMediaFlowing = false;
   bool _showDebugConsole = false;
-  bool _isSpeakerOn = false; // UI Placeholder for future Audio Routing
-  bool _isMuted = false;     // UI Placeholder for future Mute
+  bool _isSpeakerOn = false; // Hoparlör Durumu
+  bool _isMuted = false;     
   
   int _rxPackets = 0;
   int _txPackets = 0;
   int _callDurationSeconds = 0;
   Timer? _durationTimer;
   String _sipStatus = "IDLE";
+
+  @override
+  void initState() {
+    super.initState();
+    _initAudioSession();
+  }
+
+  // YENİ: Uygulama açıldığında İşletim Sistemine VoIP yapacağımızı bildiririz
+  Future<void> _initAudioSession() async {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.speech());
+  }
+
+  // YENİ: Hoparlör (Speaker) veya Ahize (Earpiece) arasında geçiş yapar
+  Future<void> _toggleSpeaker() async {
+    final session = await AudioSession.instance;
+    setState(() {
+      _isSpeakerOn = !_isSpeakerOn;
+    });
+    
+    // Hoparlör açıksa Müzik/Video moduna, kapalıysa Kulaklık (Ahize) moduna geçirir
+    if (_isSpeakerOn) {
+      await session.configure(const AudioSessionConfiguration.music());
+    } else {
+      await session.configure(const AudioSessionConfiguration.speech());
+    }
+  }
 
   void _startDurationTimer() {
     _callDurationSeconds = 0;
@@ -157,6 +185,11 @@ class _DialerScreenState extends State<DialerScreen> {
     }
 
     if (status.isGranted) {
+      // Çağrı başlarken kesinlikle Ahize modunda olmasını garanti edelim
+      if (_isSpeakerOn) {
+        await _toggleSpeaker(); 
+      }
+
       setState(() {
         _telemetryLogs.clear();
         _isCalling = true;
@@ -197,7 +230,7 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sentiric UAC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
+        title: const Text('FIELD UAC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -220,7 +253,6 @@ class _DialerScreenState extends State<DialerScreen> {
     );
   }
 
-  // --- EKRAN 1: BOŞTA (IDLE) DURUMU ---
   Widget _buildDialerForm() {
     return Expanded(
       child: SingleChildScrollView(
@@ -232,20 +264,20 @@ class _DialerScreenState extends State<DialerScreen> {
             const SizedBox(height: 8),
             Row(children: [
               Expanded(flex: 3, child: _input(_ipController, "Target IP", Icons.dns)),
-              const SizedBox(width: 12),
-              Expanded(flex: 1, child: _input(_portController, "Port", Icons.numbers)),
+              const SizedBox(width: 8),
+              // [FIX]: Flex oranını artırdık ve iç padding'i azalttık ki "Port" kelimesi sığsın
+              Expanded(flex: 2, child: _input(_portController, "Port", Icons.numbers, isCompact: true)),
             ]),
             const SizedBox(height: 24),
             
             const Text("SIP IDENTITY", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
             const SizedBox(height: 8),
-            _input(_toController, "Destination Number (e.g., 9999 for Echo)", Icons.call_made),
+            _input(_toController, "Destination (e.g., 9999)", Icons.call_made),
             const SizedBox(height: 12),
             _input(_fromController, "Your Caller ID", Icons.person_outline),
             
             const SizedBox(height: 40),
             
-            // Büyük Arama Butonu
             GestureDetector(
               onTap: _toggleCall,
               child: Container(
@@ -272,12 +304,10 @@ class _DialerScreenState extends State<DialerScreen> {
     );
   }
 
-  // --- EKRAN 2: AKTİF ÇAĞRI DURUMU ---
   Widget _buildActiveCallScreen() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        // Status Header
         Column(
           children: [
             Text(_toController.text, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w300, color: Colors.white)),
@@ -288,7 +318,6 @@ class _DialerScreenState extends State<DialerScreen> {
           ],
         ),
 
-        // Media Stats (Cyberpunk Vibe)
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 40),
           padding: const EdgeInsets.all(16),
@@ -303,7 +332,6 @@ class _DialerScreenState extends State<DialerScreen> {
           ),
         ),
 
-        // Action Buttons (Placeholder for DTMF/Audio)
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -313,11 +341,11 @@ class _DialerScreenState extends State<DialerScreen> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("DTMF Keypad - SDK Implementation Pending"), duration: Duration(seconds: 1)));
             }),
             const SizedBox(width: 30),
-            _actionBtn(Icons.volume_up, "SPEAKER", _isSpeakerOn, () => setState(() => _isSpeakerOn = !_isSpeakerOn)),
+            // DÜZELTME: Hoparlör butonu artık aktif bir şekilde çalışıyor
+            _actionBtn(_isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", _isSpeakerOn, _toggleSpeaker),
           ],
         ),
 
-        // Hangup Button
         GestureDetector(
           onTap: _toggleCall,
           child: Container(
@@ -350,19 +378,20 @@ class _DialerScreenState extends State<DialerScreen> {
     );
   }
 
-  Widget _input(TextEditingController ctrl, String label, IconData icon) {
+  // [FIX]: isCompact parametresi ile Port kutusunun taşması engellendi.
+  Widget _input(TextEditingController ctrl, String label, IconData icon, {bool isCompact = false}) {
     return TextField(
       controller: ctrl,
-      style: const TextStyle(fontSize: 14, fontFamily: 'monospace', color: Colors.white),
+      style: TextStyle(fontSize: isCompact ? 12 : 14, fontFamily: 'monospace', color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-        prefixIcon: Icon(icon, size: 18, color: Colors.grey),
+        labelStyle: TextStyle(fontSize: isCompact ? 10 : 12, color: Colors.grey),
+        prefixIcon: Icon(icon, size: isCompact ? 14 : 18, color: Colors.grey),
         filled: true,
         fillColor: const Color(0xFF18181B),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF00FF9D))),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: isCompact ? 4 : 12),
       ),
     );
   }
