@@ -8,7 +8,7 @@ license = "AGPL-3.0"
 
 [dependencies]
 # SDK v0.3.0'a yükseltildi (Headless Mode Support)
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.6" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.7" }
 
 # --- Utilities ---
 tokio = { version = "1", features = ["full"] }
