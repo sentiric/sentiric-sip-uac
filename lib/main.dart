@@ -1,8 +1,8 @@
 // sentiric-sip-mobile-uac/lib/main.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // MethodChannel için
 import 'package:permission_handler/permission_handler.dart';
-import 'package:audio_session/audio_session.dart'; // YENİ: Ses yönlendirmesi için
 import 'package:sentiric_sip_mobile_uac/src/rust/api/simple.dart';
 import 'package:sentiric_sip_mobile_uac/src/rust/frb_generated.dart';
 import 'package:sentiric_sip_mobile_uac/telecom_telemetry.dart';
@@ -57,6 +57,9 @@ class DialerScreen extends StatefulWidget {
 }
 
 class _DialerScreenState extends State<DialerScreen> {
+  // NATIVE AUDIO CHANNEL KÖPRÜSÜ
+  static const platform = MethodChannel('ai.sentiric.mobile/audio_route');
+
   final TextEditingController _ipController = TextEditingController(text: "34.122.40.122");
   final TextEditingController _portController = TextEditingController(text: "5060");
   final TextEditingController _toController = TextEditingController(text: "9999");
@@ -68,7 +71,7 @@ class _DialerScreenState extends State<DialerScreen> {
   bool _isCalling = false;
   bool _isMediaFlowing = false;
   bool _showDebugConsole = false;
-  bool _isSpeakerOn = false; // Hoparlör Durumu
+  bool _isSpeakerOn = false; 
   bool _isMuted = false;     
   
   int _rxPackets = 0;
@@ -77,30 +80,15 @@ class _DialerScreenState extends State<DialerScreen> {
   Timer? _durationTimer;
   String _sipStatus = "IDLE";
 
-  @override
-  void initState() {
-    super.initState();
-    _initAudioSession();
-  }
-
-  // YENİ: Uygulama açıldığında İşletim Sistemine VoIP yapacağımızı bildiririz
-  Future<void> _initAudioSession() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.speech());
-  }
-
-  // YENİ: Hoparlör (Speaker) veya Ahize (Earpiece) arasında geçiş yapar
+  // Native Android AudioManager'a Speaker Değişimi Emri Gönder
   Future<void> _toggleSpeaker() async {
-    final session = await AudioSession.instance;
     setState(() {
       _isSpeakerOn = !_isSpeakerOn;
     });
-    
-    // Hoparlör açıksa Müzik/Video moduna, kapalıysa Kulaklık (Ahize) moduna geçirir
-    if (_isSpeakerOn) {
-      await session.configure(const AudioSessionConfiguration.music());
-    } else {
-      await session.configure(const AudioSessionConfiguration.speech());
+    try {
+      await platform.invokeMethod('setInCallMode', {'speakerOn': _isSpeakerOn});
+    } catch (e) {
+      debugPrint("Audio Route Error: $e");
     }
   }
 
@@ -145,6 +133,8 @@ class _DialerScreenState extends State<DialerScreen> {
            _isCalling = false;
            _isMediaFlowing = false;
            _stopDurationTimer();
+           // Çağrı bitince Android Ses Motorunu normale döndür
+           platform.invokeMethod('setNormalMode').catchError((_) {});
         }
         _addLog(entry);
       }
@@ -176,6 +166,8 @@ class _DialerScreenState extends State<DialerScreen> {
         _sipStatus = "TERMINATING...";
         _stopDurationTimer();
       });
+      // Native'e çağrının bittiğini bildir
+      platform.invokeMethod('setNormalMode').catchError((_) {});
       return;
     }
 
@@ -185,9 +177,12 @@ class _DialerScreenState extends State<DialerScreen> {
     }
 
     if (status.isGranted) {
-      // Çağrı başlarken kesinlikle Ahize modunda olmasını garanti edelim
-      if (_isSpeakerOn) {
-        await _toggleSpeaker(); 
+      // ÇAĞRI BAŞLARKEN: Android'i VoIP moduna sok, Hoparlörü Kapat (Ahizeye al)
+      _isSpeakerOn = false;
+      try {
+        await platform.invokeMethod('setInCallMode', {'speakerOn': false});
+      } catch (e) {
+        debugPrint("Native Audio Init Failed: $e");
       }
 
       setState(() {
@@ -210,16 +205,23 @@ class _DialerScreenState extends State<DialerScreen> {
 
         stream.listen(
           (event) => _processEvent(event),
-          onDone: () => setState(() { 
-            _isCalling = false; 
-            _sipStatus = "DISCONNECTED"; 
-            _stopDurationTimer();
-          }),
-          onError: (e) => _processEvent("Error(\"Stream Fail: $e\")"),
+          onDone: () {
+            setState(() { 
+              _isCalling = false; 
+              _sipStatus = "DISCONNECTED"; 
+              _stopDurationTimer();
+            });
+            platform.invokeMethod('setNormalMode').catchError((_) {});
+          },
+          onError: (e) {
+            _processEvent("Error(\"Stream Fail: $e\")");
+            platform.invokeMethod('setNormalMode').catchError((_) {});
+          },
         );
       } catch (e) {
         _processEvent("Error(\"Init Fail: $e\")");
         setState(() => _isCalling = false);
+        platform.invokeMethod('setNormalMode').catchError((_) {});
       }
     } else {
       _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED BY USER", level: TelemetryLevel.error));
@@ -341,7 +343,7 @@ class _DialerScreenState extends State<DialerScreen> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("DTMF Keypad - SDK Implementation Pending"), duration: Duration(seconds: 1)));
             }),
             const SizedBox(width: 30),
-            // DÜZELTME: Hoparlör butonu artık aktif bir şekilde çalışıyor
+            // Hoparlör Butonu artık doğrudan Android AudioManager ile konuşuyor
             _actionBtn(_isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", _isSpeakerOn, _toggleSpeaker),
           ],
         ),
@@ -378,7 +380,6 @@ class _DialerScreenState extends State<DialerScreen> {
     );
   }
 
-  // [FIX]: isCompact parametresi ile Port kutusunun taşması engellendi.
   Widget _input(TextEditingController ctrl, String label, IconData icon, {bool isCompact = false}) {
     return TextField(
       controller: ctrl,
