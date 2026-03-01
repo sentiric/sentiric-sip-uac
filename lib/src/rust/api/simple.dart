@@ -6,10 +6,14 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// Uygulama ilk açıldığında Rust loglarını Android sistemine bağlar.
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CMD_TX`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`, `initialize`
+
 Future<void> initLogger() => RustLib.instance.api.crateApiSimpleInitLogger();
 
-/// SIP çağrısını başlatır ve olayları Flutter UI'a anlık olarak stream eder.
+/// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
+Future<void> endSipCall() => RustLib.instance.api.crateApiSimpleEndSipCall();
+
 Stream<String> startSipCall({
   required String targetIp,
   required int targetPort,
