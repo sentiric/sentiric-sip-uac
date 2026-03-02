@@ -11,20 +11,19 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "ai.sentiric.mobile/audio_route"
     private lateinit var audioManager: AudioManager
+    
+    // Eski ses seviyesini saklamak için
+    private var previousMusicVolume: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
-        // [KRİTİK FIX - SES KISIKLIĞI ÇÖZÜMÜ]: 
-        // Cihazın yan tarafındaki fiziksel ses tuşlarının Müzik değil, 
-        // "Arama Sesi"ni (Voice Call) kontrol etmesini zorunlu kılarız.
+        // Varsayılan olarak ses tuşları Arama Sesini kontrol etsin
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         try {
             System.loadLibrary("mobile_uac")
-            android.util.Log.i("SentiricMobile", "Rust Native Library Loaded Successfully")
         } catch (e: UnsatisfiedLinkError) {
             android.util.Log.e("SentiricMobile", "Failed to load Rust Native Library", e)
         }
@@ -38,20 +37,39 @@ class MainActivity: FlutterActivity() {
                 "setInCallMode" -> {
                     val speakerOn = call.argument<Boolean>("speakerOn") ?: false
                     
-                    // İşletim sistemine VoIP modunda olduğumuzu bildir (Donanım Yankı Engelleyiciyi açar)
-                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    audioManager.isSpeakerphoneOn = speakerOn
+                    // 1. Önceki Müzik Sesini Kaydet
+                    previousMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                     
-                    // Android'den ses odağını zorla al (Arka planda çalan müziği vs susturur)
-                    audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    // 2. Müzik Sesini (RTP akışımız buradan geliyor) Max'a yakın bir seviyeye çek
+                    //    Arama modunda olduğumuz için bu kulağı sağır etmez, sadece duyulabilir yapar.
+                    val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    // %80 seviyesi güvenlidir
+                    val targetVol = (maxMusicVol * 0.8).toInt() 
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
+
+                    // 3. Modu Değiştir (AEC ve Routing için kritik)
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    
+                    if (speakerOn) {
+                        audioManager.isSpeakerphoneOn = true
+                    } else {
+                        audioManager.isSpeakerphoneOn = false
+                    }
+                    
+                    // 4. Ses Odağını Al
+                    audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                     
                     result.success(null)
                 }
                 "setNormalMode" -> {
-                    // Çağrı bittiğinde telefonu normal haline döndür
+                    // Modu Normale Döndür
                     audioManager.mode = AudioManager.MODE_NORMAL
                     audioManager.isSpeakerphoneOn = false
                     audioManager.abandonAudioFocus(null)
+                    
+                    // Ses Seviyesini Eski Haline Getir (Kullanıcıya saygı)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, previousMusicVolume, 0)
+                    
                     result.success(null)
                 }
                 else -> {

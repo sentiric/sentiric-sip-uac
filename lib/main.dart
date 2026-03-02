@@ -232,7 +232,7 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FIELD UAC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
+        title: const Text('Sentiric UAC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
