@@ -14,11 +14,11 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flutter_rust_bridge: 2.11.1
-
-  # YENİ: İzin yönetimi için
   permission_handler: ^11.3.1  
   rename_app: ^1.6.5
   flutter_launcher_icons: ^0.14.4
+  # [YENİ]: Verileri (Caller ID, IP vb.) kaydetmek için
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
