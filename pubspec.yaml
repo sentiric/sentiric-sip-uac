@@ -2,8 +2,8 @@ name: sentiric_sip_mobile_uac
 description: "Sentiric Mobile SIP UAC for field testing and validation."
 publish_to: 'none'
 
-# [UPDATE]: Version Bump
-version: 1.1.0+2
+# sentiric-sip-mobile-uac/pubspec.yaml
+version: 1.2.0+3  # (v1.2.0, Build 3)
 
 environment:
   sdk: ^3.10.4
