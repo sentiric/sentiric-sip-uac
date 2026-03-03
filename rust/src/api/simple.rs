@@ -96,3 +96,15 @@ pub async fn start_sip_call(
     
     Ok(())
 }
+
+pub async fn update_audio_settings(mic_gain: f32, speaker_gain: f32, enable_aec: bool) {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        // [YENİ]: SDK'nın yeni komutu ile iletişime geçiyor.
+        let _ = tx.send(ClientCommand::UpdateSettings {
+            mic_gain,
+            speaker_gain,
+            enable_aec,
+        }).await;
+    }
+}

@@ -25,3 +25,13 @@ Stream<String> startSipCall({
   toUser: toUser,
   fromUser: fromUser,
 );
+
+Future<void> updateAudioSettings({
+  required double micGain,
+  required double speakerGain,
+  required bool enableAec,
+}) => RustLib.instance.api.crateApiSimpleUpdateAudioSettings(
+  micGain: micGain,
+  speakerGain: speakerGain,
+  enableAec: enableAec,
+);
