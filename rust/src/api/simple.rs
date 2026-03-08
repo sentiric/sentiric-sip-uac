@@ -24,12 +24,16 @@ pub extern "system" fn JNI_OnLoad(vm: jni::JavaVM, _res: *mut std::ffi::c_void) 
 }
 
 pub fn init_logger() {
+    // [MİMARİ DÜZELTME]: Kodek Şizofrenisini Engelleyen Kilit.
+    // Asterisk ve diğer sistemlerle %100 uyumluluk için PCMU zorunlu kılındı.
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMU");
+
     android_logger::init_once(
         Config::default()
             .with_max_level(LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    info!("✅ Mobile Logger Initialized via SDK v2.0");
+    log::info!("✅ Mobile Logger Initialized via SDK v2.0 with STRICT PCMU codec.");
 }
 
 /// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
