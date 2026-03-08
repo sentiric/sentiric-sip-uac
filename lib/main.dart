@@ -1,4 +1,4 @@
-// sentiric-sip-mobile-uac/lib/main.dart
+// lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,15 +31,15 @@ class SentiricApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sentiric UAC',
+      title: 'Sentiric Field UAC',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF09090B),
+        scaffoldBackgroundColor: const Color(0xFF000000), // Amoled Black
         primaryColor: const Color(0xFF00FF9D),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF00FF9D),
           secondary: Colors.cyanAccent,
-          surface: Color(0xFF18181B),
+          surface: Color(0xFF111111),
         ),
       ),
       home: const MainNavigationScreen(),
@@ -47,7 +47,7 @@ class SentiricApp extends StatelessWidget {
   }
 }
 
-// --- ANA NAVİGASYON (PRODUCT READY YAPI) ---
+// --- ANA NAVİGASYON ---
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -71,21 +71,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         children: _screens,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF18181B),
+        backgroundColor: const Color(0xFF111111),
         selectedItemColor: const Color(0xFF00FF9D),
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: Colors.white30,
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dialpad), label: "Dialer"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
+          BottomNavigationBarItem(icon: Icon(Icons.radar), label: "Field Test"),
+          BottomNavigationBarItem(icon: Icon(Icons.tune), label: "DSP Tuning"),
         ],
       ),
     );
   }
 }
 
-// --- AYARLAR EKRANI ---
+// --- DSP TUNING EKRANI ---
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -119,7 +119,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setDouble('speakerGain', _speakerGain);
     await prefs.setBool('enableAec', _enableAec);
     
-    // TODO: Adım 2'de bu değerleri Rust tarafına (Engine'e) anlık göndereceğiz.
+    // Rust katmanına canlı gönder
+    updateAudioSettings(micGain: _micGain, speakerGain: _speakerGain, enableAec: _enableAec);
   }
 
   @override
@@ -128,23 +129,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text("DSP SETTINGS", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-          const SizedBox(height: 20),
+          const Text("REAL-TIME DSP TUNING", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+          const SizedBox(height: 30),
           
-          _buildSlider("Microphone Gain", _micGain, 0.1, 3.0, (val) {
+          _buildSlider("Hardware TX Gain (Microphone)", _micGain, 0.1, 3.0, (val) {
             setState(() => _micGain = val);
             _saveSettings();
           }),
           
-          _buildSlider("Speaker Gain", _speakerGain, 0.1, 5.0, (val) {
+          _buildSlider("Hardware RX Gain (Speaker)", _speakerGain, 0.1, 5.0, (val) {
             setState(() => _speakerGain = val);
             _saveSettings();
           }),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 30),
           SwitchListTile(
-            title: const Text("Hardware AEC (Echo Cancel)", style: TextStyle(fontSize: 14)),
-            subtitle: const Text("Use OS level acoustic echo cancellation", style: TextStyle(fontSize: 12, color: Colors.grey)),
+            title: const Text("OS Acoustic Echo Cancel", style: TextStyle(fontSize: 14)),
+            subtitle: const Text("Applies hardware AEC via AudioTrack routing.", style: TextStyle(fontSize: 12, color: Colors.white30)),
             value: _enableAec,
             activeColor: const Color(0xFF00FF9D),
             contentPadding: EdgeInsets.zero,
@@ -166,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(fontSize: 14)),
-            Text("${value.toStringAsFixed(1)}x", style: const TextStyle(color: Color(0xFF00FF9D), fontWeight: FontWeight.bold)),
+            Text("${value.toStringAsFixed(1)}x", style: const TextStyle(color: Color(0xFF00FF9D), fontWeight: FontWeight.bold, fontFamily: 'monospace')),
           ],
         ),
         Slider(
@@ -183,7 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// --- ARAMA EKRANI (DIALER) ---
+// --- FIELD TEST (DIALER) ---
 class DialerScreen extends StatefulWidget {
   const DialerScreen({super.key});
   @override
@@ -211,22 +212,21 @@ class _DialerScreenState extends State<DialerScreen> {
   int _txPackets = 0;
   int _callDurationSeconds = 0;
   Timer? _durationTimer;
-  String _sipStatus = "IDLE";
+  String _sipStatus = "STANDBY";
 
   @override
   void initState() {
     super.initState();
-    _loadProfile(); // Açılışta son girilen bilgileri yükle
+    _loadProfile(); 
   }
 
-  // --- PERSISTENCE LOGIC ---
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _ipController.text = prefs.getString('targetIp') ?? "";
-      _portController.text = prefs.getString('targetPort') ?? "";
-      _toController.text = prefs.getString('toUser') ?? "";
-      _fromController.text = prefs.getString('fromUser') ?? ""; // Strict E.164 formatı
+      _portController.text = prefs.getString('targetPort') ?? "5060";
+      _toController.text = prefs.getString('toUser') ?? "9999";
+      _fromController.text = prefs.getString('fromUser') ?? "field-uac"; 
     });
   }
 
@@ -237,7 +237,6 @@ class _DialerScreenState extends State<DialerScreen> {
     await prefs.setString('toUser', _toController.text.trim());
     await prefs.setString('fromUser', _fromController.text.trim());
   }
-  // -----------------------
 
   Future<void> _toggleSpeaker() async {
     setState(() { _isSpeakerOn = !_isSpeakerOn; });
@@ -270,11 +269,11 @@ class _DialerScreenState extends State<DialerScreen> {
         _txPackets = entry.txCount!;
         if (_rxPackets > 5) _isMediaFlowing = true;
       } 
-      else if (entry.message.contains("SIP STATE:") || entry.message.contains("CallStateChanged")) {
-        _sipStatus = entry.message.split(RegExp(r'[:\(]')).last.replaceAll(")", "").trim().toUpperCase();
+      else if (entry.message.contains("SYSTEM STATE:")) {
+        _sipStatus = entry.message.split(':').last.trim().toUpperCase();
         
         if (_sipStatus == "CONNECTED") { _startDurationTimer(); }
-        else if (_sipStatus == "TERMINATED") {
+        else if (_sipStatus == "TERMINATED" || _sipStatus == "IDLE") {
            _isCalling = false;
            _isMediaFlowing = false;
            _stopDurationTimer();
@@ -313,7 +312,6 @@ class _DialerScreenState extends State<DialerScreen> {
       return;
     }
 
-    // Çağrı başlatırken profili otomatik kaydet
     await _saveProfile();
 
     PermissionStatus status = await Permission.microphone.status;
@@ -358,7 +356,7 @@ class _DialerScreenState extends State<DialerScreen> {
         platform.invokeMethod('setNormalMode').catchError((_) {});
       }
     } else {
-      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED BY USER", level: TelemetryLevel.error));
+      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
     }
   }
 
@@ -366,14 +364,14 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sentiric UAC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
+        title: const Text('SENTIRIC UAC', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 3.0)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: () => setState(() => _showDebugConsole = !_showDebugConsole), 
-            icon: Icon(Icons.bug_report, color: _showDebugConsole ? Colors.greenAccent : Colors.grey)
+            icon: Icon(Icons.terminal, color: _showDebugConsole ? const Color(0xFF00FF9D) : Colors.white30)
           )
         ],
       ),
@@ -392,43 +390,43 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget _buildDialerForm() {
     return Expanded(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("NETWORK EDGE", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-            const SizedBox(height: 8),
+            const Text("TARGET NODE", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+            const SizedBox(height: 12),
             Row(children: [
-              Expanded(flex: 3, child: _input(_ipController, "Target IP", Icons.dns, keyboardType: TextInputType.url)),
+              Expanded(flex: 3, child: _input(_ipController, "IP Address", Icons.dns, keyboardType: TextInputType.url)),
               const SizedBox(width: 8),
               Expanded(flex: 2, child: _input(_portController, "Port", Icons.numbers, isCompact: true, keyboardType: TextInputType.number)),
             ]),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             
-            const Text("SIP IDENTITY", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-            const SizedBox(height: 8),
-            _input(_toController, "Destination (e.g., 9999)", Icons.call_made, keyboardType: TextInputType.phone),
+            const Text("SIP PROTOCOL", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             const SizedBox(height: 12),
-            _input(_fromController, "Your Caller ID", Icons.person_outline, keyboardType: TextInputType.phone),
+            _input(_toController, "Destination Ext (e.g., 9999)", Icons.call_made, keyboardType: TextInputType.phone),
+            const SizedBox(height: 12),
+            _input(_fromController, "Caller Identity", Icons.person_outline, keyboardType: TextInputType.text),
             
-            const SizedBox(height: 40),
+            const SizedBox(height: 48),
             
             GestureDetector(
               onTap: _toggleCall,
               child: Container(
-                height: 80,
+                height: 70,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FF9D).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(color: const Color(0xFF00FF9D), width: 2),
-                  boxShadow: const [BoxShadow(color: Color(0x3300FF9D), blurRadius: 20, spreadRadius: 5)],
+                  color: const Color(0xFF00FF9D).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00FF9D), width: 1.5),
+                  boxShadow: const [BoxShadow(color: Color(0x2200FF9D), blurRadius: 30, spreadRadius: 2)],
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.phone, color: Color(0xFF00FF9D), size: 32),
+                    Icon(Icons.rocket_launch, color: Color(0xFF00FF9D), size: 24),
                     SizedBox(width: 16),
-                    Text("START TEST CALL", style: TextStyle(color: Color(0xFF00FF9D), fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    Text("INJECT CALL", style: TextStyle(color: Color(0xFF00FF9D), fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
                   ],
                 ),
               ),
@@ -440,29 +438,40 @@ class _DialerScreenState extends State<DialerScreen> {
   }
 
   Widget _buildActiveCallScreen() {
+    // Ringing veya Connecting sırasında pulse efekti
+    Color statusColor = _sipStatus == "CONNECTED" ? const Color(0xFF00FF9D) : Colors.orangeAccent;
+    
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         Column(
           children: [
-            Text(_toController.text, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w300, color: Colors.white)),
-            const SizedBox(height: 8),
-            Text(_sipStatus, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0, color: _sipStatus == "CONNECTED" ? Colors.greenAccent : Colors.orangeAccent)),
-            const SizedBox(height: 8),
-            Text(_sipStatus == "CONNECTED" ? _formattedDuration : "Connecting...", style: const TextStyle(fontSize: 16, color: Colors.grey, fontFamily: 'monospace')),
+            Text(_toController.text, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: statusColor.withOpacity(0.5)),
+              ),
+              child: Text(_sipStatus, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: statusColor)),
+            ),
+            const SizedBox(height: 16),
+            Text(_sipStatus == "CONNECTED" ? _formattedDuration : "Negotiating...", style: const TextStyle(fontSize: 18, color: Colors.white54, fontFamily: 'monospace')),
           ],
         ),
 
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 40),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: const Color(0xFF18181B), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+          margin: const EdgeInsets.symmetric(horizontal: 30),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _statItem("TX (SENT)", "$_txPackets", Colors.white70),
-              Icon(Icons.compare_arrows, color: _isMediaFlowing ? Colors.greenAccent : Colors.grey, size: 24),
-              _statItem("RX (RECV)", "$_rxPackets", Colors.white70),
+              _statItem("TX (EGRESS)", "$_txPackets", Colors.white70),
+              Icon(Icons.compare_arrows, color: _isMediaFlowing ? const Color(0xFF00FF9D) : Colors.white24, size: 28),
+              _statItem("RX (INGRESS)", "$_rxPackets", Colors.white70),
             ],
           ),
         ),
@@ -471,20 +480,20 @@ class _DialerScreenState extends State<DialerScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _actionBtn(Icons.mic_off, _isMuted ? "MUTED" : "MUTE", _isMuted, () => setState(() => _isMuted = !_isMuted)),
-            const SizedBox(width: 30),
-            _actionBtn(Icons.dialpad, "KEYPAD", false, () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("DTMF Keypad - Coming Soon"), duration: Duration(seconds: 1)));
-            }),
-            const SizedBox(width: 30),
-            _actionBtn(_isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", _isSpeakerOn, _toggleSpeaker),
+            const SizedBox(width: 40),
+            _actionBtn(_isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "ROUTE", _isSpeakerOn, _toggleSpeaker),
           ],
         ),
 
         GestureDetector(
           onTap: _toggleCall,
           child: Container(
-            height: 70, width: 70,
-            decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.red, blurRadius: 20)]),
+            height: 80, width: 80,
+            decoration: const BoxDecoration(
+              color: Colors.redAccent, 
+              shape: BoxShape.circle, 
+              boxShadow: [BoxShadow(color: Color(0x66FF5252), blurRadius: 20, spreadRadius: 2)]
+            ),
             child: const Icon(Icons.call_end, color: Colors.white, size: 36),
           ),
         ),
@@ -498,15 +507,15 @@ class _DialerScreenState extends State<DialerScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: isActive ? Colors.white : const Color(0xFF27272A),
+              color: isActive ? Colors.white : const Color(0xFF1A1A1A),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 24),
+            child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 26),
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
         ],
       ),
     );
@@ -516,16 +525,16 @@ class _DialerScreenState extends State<DialerScreen> {
     return TextField(
       controller: ctrl,
       keyboardType: keyboardType,
-      style: TextStyle(fontSize: isCompact ? 12 : 14, fontFamily: 'monospace', color: Colors.white),
+      style: TextStyle(fontSize: isCompact ? 13 : 15, fontFamily: 'monospace', color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(fontSize: isCompact ? 10 : 12, color: Colors.grey),
-        prefixIcon: Icon(icon, size: isCompact ? 14 : 18, color: Colors.grey),
+        labelStyle: TextStyle(fontSize: isCompact ? 11 : 13, color: Colors.white30, letterSpacing: 1.0),
+        prefixIcon: Icon(icon, size: isCompact ? 16 : 20, color: Colors.white30),
         filled: true,
-        fillColor: const Color(0xFF18181B),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF00FF9D))),
-        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: isCompact ? 4 : 12),
+        fillColor: const Color(0xFF111111),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00FF9D), width: 1.5)),
+        contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: isCompact ? 6 : 16),
       ),
     );
   }
@@ -533,9 +542,9 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget _statItem(String label, String val, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(val, style: TextStyle(fontSize: 16, color: color, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(fontSize: 9, color: Colors.white30, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+        Text(val, style: TextStyle(fontSize: 20, color: color, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -543,33 +552,39 @@ class _DialerScreenState extends State<DialerScreen> {
   Widget _buildConsole() {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.black,
-        border: Border(top: BorderSide(color: Colors.white24)),
+        color: Color(0xFF090909),
+        border: Border(top: BorderSide(color: Colors.white10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(4),
-            color: Colors.white10,
-            child: const Text(" SYSTEM LOGS", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: const Color(0xFF111111),
+            child: const Row(
+              children: [
+                Icon(Icons.terminal, color: Colors.white30, size: 14),
+                SizedBox(width: 8),
+                Text("LIVE TELEMETRY STREAM", style: TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+              ],
+            ),
           ),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               itemCount: _telemetryLogs.length,
               itemBuilder: (context, index) {
                 final log = _telemetryLogs[index];
-                Color color = Colors.white60;
+                Color color = Colors.white54;
                 if (log.level == TelemetryLevel.status) color = const Color(0xFF00FF9D);
                 if (log.level == TelemetryLevel.error) color = Colors.redAccent;
                 if (log.level == TelemetryLevel.sip) color = Colors.cyanAccent;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(log.message, style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11)),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text("> ${log.message}", style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11)),
                 );
               },
             ),

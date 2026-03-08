@@ -7,7 +7,6 @@ class TelemetryEntry {
   final TelemetryLevel level;
   final bool isSipPacket;
   
-  // İstatistiksel veriler (Varsa)
   final int? rxCount;
   final int? txCount;
 
@@ -21,71 +20,56 @@ class TelemetryEntry {
 }
 
 class TelecomTelemetry {
-  /// Rust SDK'dan gelen olay string'lerini (Debug format) parse eder.
   static TelemetryEntry parse(String raw) {
     
-    // 1. MEDYA AKIŞI BAŞLADI (Latching Success)
+    // 1. MEDIA ACTIVE
     if (raw.contains("MediaActive")) {
       return TelemetryEntry(
-        message: "🎙️ AUDIO PATH ESTABLISHED (2-WAY)",
+        message: "🎙️ SECURE RTP CHANNEL ESTABLISHED",
         level: TelemetryLevel.status,
       );
     }
 
-    // 2. İSTATİSTİKLER (RtpStats)
-    // Rust Formatı: RtpStats { rx_cnt: 123, tx_cnt: 456 }
+    // 2. RTP STATS
     if (raw.contains("RtpStats")) {
       final rxMatch = RegExp(r"rx_cnt:\s*(\d+)").firstMatch(raw);
       final txMatch = RegExp(r"tx_cnt:\s*(\d+)").firstMatch(raw);
-      
-      final rx = int.tryParse(rxMatch?.group(1) ?? "0");
-      final tx = int.tryParse(txMatch?.group(1) ?? "0");
-
       return TelemetryEntry(
-        message: "Stats Update", // Bu mesaj UI'da log olarak gösterilmeyecek, sadece sayaçları güncelleyecek
+        message: "Stats Update", 
         level: TelemetryLevel.media,
-        rxCount: rx,
-        txCount: tx,
+        rxCount: int.tryParse(rxMatch?.group(1) ?? "0"),
+        txCount: int.tryParse(txMatch?.group(1) ?? "0"),
       );
     }
 
-    // 3. SIP DURUM DEĞİŞİMİ
-    // Rust Formatı: CallStateChanged(Connected)
+    // 3. CALL STATE
     if (raw.contains("CallStateChanged")) {
-      // Parantez içini al
       final state = raw.split('(').last.split(')').first;
       return TelemetryEntry(
-        message: "🔔 SIP STATE: $state",
+        message: "🔔 SYSTEM STATE: $state",
         level: TelemetryLevel.status,
       );
     }
 
-    // 4. HATALAR
+    // 4. ERRORS
     if (raw.contains("Error") || raw.contains("Fail")) {
-      // Temizleme: Error("...") formatından tırnakları ve sarmalayıcıyı at
       String clean = raw.replaceAll("Error(", "").replaceAll(")", "").replaceAll("\"", "");
       return TelemetryEntry(
-        message: "❌ ERROR: $clean",
+        message: "❌ SYSTEM HALT: $clean",
         level: TelemetryLevel.error,
       );
     }
 
-    // 5. STANDART LOGLAR ve SIP PAKETLERİ
+    // 5. GENERIC LOGS
     if (raw.contains("Log(")) {
-      // Log("...") içeriğini çıkar
       String content = raw;
       int start = raw.indexOf("Log(\"");
       if (start != -1) {
         content = raw.substring(start + 5, raw.lastIndexOf("\""));
       }
-      
-      // Kaçış karakterlerini düzelt (Rust debug formatından gelen \n'ler)
       content = content.replaceAll("\\n", "\n").replaceAll("\\r", "").replaceAll("\\\"", "\"");
 
-      bool isSip = content.contains("SIP/2.0") || 
-                   content.contains("INVITE") || 
-                   content.contains("ACK") ||
-                   content.contains("BYE");
+      bool isSip = content.contains("SIP/2.0") || content.contains("INVITE") || content.contains("ACK");
 
       return TelemetryEntry(
         message: content,
@@ -94,7 +78,6 @@ class TelecomTelemetry {
       );
     }
 
-    // Tanınmayan format (Fallback)
     return TelemetryEntry(message: raw);
   }
 }
