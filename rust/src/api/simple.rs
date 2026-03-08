@@ -1,6 +1,6 @@
 // sentiric-sip-mobile-uac/rust/src/api/simple.rs
 
-use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState, ClientCommand};
+use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; // [DÜZELTME]: TelecomClient silindi.
 use crate::frb_generated::StreamSink;
 use log::{info, LevelFilter};
 use android_logger::Config;
@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
 
-// [YENİ]: Flutter'dan her an "Durdur" komutu gönderebilmek için Global Sender.
+// Flutter'dan her an "Durdur" komutu gönderebilmek için Global Sender.
 lazy_static! {
     static ref CMD_TX: Mutex<Option<mpsc::Sender<ClientCommand>>> = Mutex::new(None);
 }
@@ -100,7 +100,6 @@ pub async fn start_sip_call(
 pub async fn update_audio_settings(mic_gain: f32, speaker_gain: f32, enable_aec: bool) {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
-        // [YENİ]: SDK'nın yeni komutu ile iletişime geçiyor.
         let _ = tx.send(ClientCommand::UpdateSettings {
             mic_gain,
             speaker_gain,
