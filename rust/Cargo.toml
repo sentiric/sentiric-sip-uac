@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 # [KRİTİK GÜNCELLEME] v0.3.15'i işaret ediyoruz.
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.20" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.21" }
 
 flutter_rust_bridge = "=2.11.1"
 tokio = { version = "1", features = ["full"] }
