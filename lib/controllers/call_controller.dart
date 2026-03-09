@@ -69,8 +69,12 @@ class CallController extends ChangeNotifier {
     }
   }
 
-  void toggleMute() {
+void toggleMute() {
     isMuted = !isMuted;
+    
+    // [YENİ]: Rust (SDK) motoruna Mute komutunu gönderiyoruz
+    setMute(muted: isMuted); 
+    
     notifyListeners();
   }
 

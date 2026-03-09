@@ -124,3 +124,14 @@ pub async fn send_sip_dtmf(key: String) {
         log::warn!("⚠️ No active call to send DTMF.");
     }
 }
+
+// YENİ: UI'dan gelen Mute komutunu SDK'ya ileten köprü fonksiyonu
+pub async fn set_mute(muted: bool) {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(ClientCommand::SetMute { muted }).await;
+        log::info!("🎤 UI Requested MUTE state: {}", muted);
+    } else {
+        log::warn!("⚠️ No active call to mute.");
+    }
+}

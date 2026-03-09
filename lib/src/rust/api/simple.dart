@@ -39,3 +39,6 @@ Future<void> updateAudioSettings({
 /// Aktif çağrıya in-band RTP DTMF tonu gönderir.
 Future<void> sendSipDtmf({required String key}) =>
     RustLib.instance.api.crateApiSimpleSendSipDtmf(key: key);
+
+Future<void> setMute({required bool muted}) =>
+    RustLib.instance.api.crateApiSimpleSetMute(muted: muted);
