@@ -35,3 +35,7 @@ Future<void> updateAudioSettings({
   speakerGain: speakerGain,
   enableAec: enableAec,
 );
+
+/// Aktif çağrıya in-band RTP DTMF tonu gönderir.
+Future<void> sendSipDtmf({required String key}) =>
+    RustLib.instance.api.crateApiSimpleSendSipDtmf(key: key);

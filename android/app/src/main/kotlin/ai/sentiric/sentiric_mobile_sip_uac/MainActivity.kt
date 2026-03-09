@@ -11,15 +11,12 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "ai.sentiric.mobile/audio_route"
     private lateinit var audioManager: AudioManager
-    
-    // Eski ses seviyesini saklamak için
     private var previousMusicVolume: Int = 0
+    private var previousMode: Int = AudioManager.MODE_NORMAL
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        
-        // Varsayılan olarak ses tuşları Arama Sesini kontrol etsin
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         try {
@@ -35,39 +32,32 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "setInCallMode" -> {
-                    val speakerOn = call.argument<Boolean>("speakerOn") ?: false
-                    
-                    // 1. Önceki Müzik Sesini Kaydet
+                    // MİMARİNİN GEREĞİ: Bu fonksiyon çağrı başlamadan önce 1 KERE çağrılır.
                     previousMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    previousMode = audioManager.mode
                     
-                    // 2. Müzik Sesini (RTP akışımız buradan geliyor) Max'a yakın bir seviyeye çek
-                    //    Arama modunda olduğumuz için bu kulağı sağır etmez, sadece duyulabilir yapar.
                     val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                    // %80 seviyesi güvenlidir
                     val targetVol = (maxMusicVol * 0.8).toInt() 
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
 
-                    // 3. Modu Değiştir (AEC ve Routing için kritik)
+                    // Modu iletişime al ve odak iste. (AAudio/cpal stream başlamadan hemen önce olmalı)
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    
-                    if (speakerOn) {
-                        audioManager.isSpeakerphoneOn = true
-                    } else {
-                        audioManager.isSpeakerphoneOn = false
-                    }
-                    
-                    // 4. Ses Odağını Al
+                    audioManager.isSpeakerphoneOn = false
                     audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                     
                     result.success(null)
                 }
+                "toggleSpeaker" -> {
+                    // MİMARİNİN GEREĞİ: Çağrı ortasında AAudio stream'i öldürmemek için SADECE hoparlör rotası değişir.
+                    val speakerOn = call.argument<Boolean>("speakerOn") ?: false
+                    audioManager.isSpeakerphoneOn = speakerOn
+                    result.success(null)
+                }
                 "setNormalMode" -> {
-                    // Modu Normale Döndür
-                    audioManager.mode = AudioManager.MODE_NORMAL
+                    // Çağrı bittiğinde eski duruma dön.
+                    audioManager.mode = previousMode
                     audioManager.isSpeakerphoneOn = false
                     audioManager.abandonAudioFocus(null)
-                    
-                    // Ses Seviyesini Eski Haline Getir (Kullanıcıya saygı)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, previousMusicVolume, 0)
                     
                     result.success(null)

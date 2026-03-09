@@ -119,7 +119,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setDouble('speakerGain', _speakerGain);
     await prefs.setBool('enableAec', _enableAec);
     
-    // Rust katmanına canlı gönder
     updateAudioSettings(micGain: _micGain, speakerGain: _speakerGain, enableAec: _enableAec);
   }
 
@@ -240,7 +239,12 @@ class _DialerScreenState extends State<DialerScreen> {
 
   Future<void> _toggleSpeaker() async {
     setState(() { _isSpeakerOn = !_isSpeakerOn; });
-    try { await platform.invokeMethod('setInCallMode', {'speakerOn': _isSpeakerOn}); } catch (e) { debugPrint("$e"); }
+    try { 
+      // [FIX]: Artık setInCallMode değil, sadece toggleSpeaker metodunu çağırıyoruz ki C++ Stream çökmesin.
+      await platform.invokeMethod('toggleSpeaker', {'speakerOn': _isSpeakerOn}); 
+    } catch (e) { 
+      debugPrint("$e"); 
+    }
   }
 
   void _startDurationTimer() {
@@ -319,7 +323,10 @@ class _DialerScreenState extends State<DialerScreen> {
 
     if (status.isGranted) {
       _isSpeakerOn = false;
-      try { await platform.invokeMethod('setInCallMode', {'speakerOn': false}); } catch (e) { debugPrint("$e"); }
+      try { 
+        // [FIX]: Çağrı (ve Rust audio stream) başlamadan hemen önce InCall modunu sabitle.
+        await platform.invokeMethod('setInCallMode'); 
+      } catch (e) { debugPrint("$e"); }
 
       setState(() {
         _telemetryLogs.clear();
@@ -358,6 +365,58 @@ class _DialerScreenState extends State<DialerScreen> {
     } else {
       _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
     }
+  }
+
+  void _showDtmfPad() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111111),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        final keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
+        return Container(
+          padding: const EdgeInsets.all(24),
+          height: 400,
+          child: Column(
+            children: [
+              const Text("DTMF KEYPAD", style: TextStyle(color: Color(0xFF00FF9D), letterSpacing: 2.0, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              Expanded(
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.5,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: keys.length,
+                  itemBuilder: (context, index) {
+                    return InkWell(
+                      onTap: () {
+                        // Rust motoruna DTMF isteğini gönderiyoruz.
+                        sendSipDtmf(key: keys[index]);
+                        _processEvent("Log(\"🎹 Sent DTMF: ${keys[index]}\")");
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(keys[index], style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w300)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -438,7 +497,6 @@ class _DialerScreenState extends State<DialerScreen> {
   }
 
   Widget _buildActiveCallScreen() {
-    // Ringing veya Connecting sırasında pulse efekti
     Color statusColor = _sipStatus == "CONNECTED" ? const Color(0xFF00FF9D) : Colors.orangeAccent;
     
     return Column(
@@ -476,11 +534,14 @@ class _DialerScreenState extends State<DialerScreen> {
           ),
         ),
 
+        // [YENİ]: DTMF Butonu eklendi.
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _actionBtn(Icons.mic_off, _isMuted ? "MUTED" : "MUTE", _isMuted, () => setState(() => _isMuted = !_isMuted)),
-            const SizedBox(width: 40),
+            const SizedBox(width: 20),
+            _actionBtn(Icons.dialpad, "KEYPAD", false, _showDtmfPad),
+            const SizedBox(width: 20),
             _actionBtn(_isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "ROUTE", _isSpeakerOn, _toggleSpeaker),
           ],
         ),
@@ -580,8 +641,8 @@ class _DialerScreenState extends State<DialerScreen> {
                 Color color = Colors.white54;
                 if (log.level == TelemetryLevel.status) color = const Color(0xFF00FF9D);
                 if (log.level == TelemetryLevel.error) color = Colors.redAccent;
-                if (log.level == TelemetryLevel.sipTx) color = Colors.blueAccent;  // Giden paketler Mavi
-                if (log.level == TelemetryLevel.sipRx) color = Colors.amberAccent; // Gelen paketler Turuncu
+                if (log.level == TelemetryLevel.sipTx) color = Colors.blueAccent;  
+                if (log.level == TelemetryLevel.sipRx) color = Colors.amberAccent; 
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),

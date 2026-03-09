@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -577991801;
+  int get rustContentHash => -1747081605;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -78,6 +78,8 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiSimpleEndSipCall();
 
   Future<void> crateApiSimpleInitLogger();
+
+  Future<void> crateApiSimpleSendSipDtmf({required String key});
 
   Stream<String> crateApiSimpleStartSipCall({
     required String targetIp,
@@ -156,6 +158,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_logger", argNames: []);
 
   @override
+  Future<void> crateApiSimpleSendSipDtmf({required String key}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiSimpleSendSipDtmfConstMeta,
+        argValues: [key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSimpleSendSipDtmfConstMeta =>
+      const TaskConstMeta(debugName: "send_sip_dtmf", argNames: ["key"]);
+
+  @override
   Stream<String> crateApiSimpleStartSipCall({
     required String targetIp,
     required int targetPort,
@@ -176,7 +206,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 3,
+              funcId: 4,
               port: port_,
             );
           },
@@ -214,7 +244,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },

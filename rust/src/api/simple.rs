@@ -1,6 +1,6 @@
 // sentiric-sip-mobile-uac/rust/src/api/simple.rs
 
-use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; // [DÜZELTME]: TelecomClient silindi.
+use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; 
 use crate::frb_generated::StreamSink;
 use log::{info, LevelFilter};
 use android_logger::Config;
@@ -109,5 +109,18 @@ pub async fn update_audio_settings(mic_gain: f32, speaker_gain: f32, enable_aec:
             speaker_gain,
             enable_aec,
         }).await;
+    }
+}
+
+/// Aktif çağrıya in-band RTP DTMF tonu gönderir.
+pub async fn send_sip_dtmf(key: String) {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        if let Some(c) = key.chars().next() {
+            let _ = tx.send(ClientCommand::SendDtmf { key: c }).await;
+            log::info!("🎹 UI Requested DTMF: {}", c);
+        }
+    } else {
+        log::warn!("⚠️ No active call to send DTMF.");
     }
 }
