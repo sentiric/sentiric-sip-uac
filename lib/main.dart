@@ -580,7 +580,8 @@ class _DialerScreenState extends State<DialerScreen> {
                 Color color = Colors.white54;
                 if (log.level == TelemetryLevel.status) color = const Color(0xFF00FF9D);
                 if (log.level == TelemetryLevel.error) color = Colors.redAccent;
-                if (log.level == TelemetryLevel.sip) color = Colors.cyanAccent;
+                if (log.level == TelemetryLevel.sipTx) color = Colors.blueAccent;  // Giden paketler Mavi
+                if (log.level == TelemetryLevel.sipRx) color = Colors.amberAccent; // Gelen paketler Turuncu
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
