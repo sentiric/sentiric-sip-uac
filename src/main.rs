@@ -3,16 +3,19 @@
 use clap::Parser;
 use std::process;
 use tokio::sync::mpsc;
+use std::time::Duration;
 use tracing::{info, warn, error, Level};
 use sentiric_telecom_client_sdk::{TelecomClient, UacEvent, CallState};
 
-/// Sentiric SIP UAC - Field Testing Tool
+mod scenario;
+use scenario::{load_scenario, ActionDef};
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Target IP Address (e.g., 34.122.40.122)
+    /// Target IP Address (e.g., 34.122.40.122). Required if --scenario is not used.
     #[arg(index = 1)]
-    target_ip: String,
+    target_ip: Option<String>,
 
     /// SIP Port
     #[arg(short, long, default_value_t = 5060)]
@@ -33,53 +36,55 @@ struct Args {
     /// Enable Debug Logs (Show RMS levels and internal states)
     #[arg(long, default_value_t = false)]
     debug: bool,
+
+    /// Load execution plan from a JSON scenario file
+    #[arg(short, long)]
+    scenario: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    // Logger Yapılandırması
+    // Senaryo mu yoksa manuel IP mi?
+    if args.target_ip.is_none() && args.scenario.is_none() {
+        eprintln!("🛑 HATA: Lütfen bir hedef IP (TARGET_IP) veya bir senaryo dosyası (--scenario) belirtin.");
+        process::exit(1);
+    }
+
     let log_level = if args.debug { Level::DEBUG } else { Level::INFO };
-    
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .without_time() // Temiz çıktı için
-        .init();
+    tracing_subscriber::fmt().with_max_level(log_level).without_time().init();
+
+    // 1. KULLANIM MODUNU BELİRLE VE PARAMETRELERİ AYARLA
+    let (target_ip, port, to, from, headless, actions) = if let Some(scenario_path) = args.scenario {
+        info!("📂 Senaryo dosyası yükleniyor: {}", scenario_path);
+        let sc = load_scenario(&scenario_path)?;
+        info!("🤖 AKTİF SENARYO: {}", sc.name);
+        (sc.target_ip, sc.port, sc.to, sc.from, sc.headless, Some(sc.actions))
+    } else {
+        (args.target_ip.unwrap(), args.port, args.to, args.from, args.headless, None)
+    };
 
     info!("==================================================");
-    info!("🚀 SENTIRIC SIP UAC (CLI) v2.4");
-    info!("   Powered by SDK v0.3.13 (Self-Healing Audio)");
+    info!("🤖 SENTIRIC AUTONOMOUS TEST BOT v2.5");
     info!("==================================================");
-    info!("🎯 Target   : {}:{}", args.target_ip, args.port);
-    info!("📞 Call     : {} -> {}", args.from, args.to);
-    
-    if args.headless {
-        info!("👻 Mode     : HEADLESS (Virtual DSP / Ping-Pong)");
-        info!("ℹ️  Hint     : Use --debug to see RMS signal levels.");
-    } else {
-        info!("🎤 Mode     : HARDWARE (Physical Sound Card)");
-    }
+    info!("🎯 Target   : {}:{}", target_ip, port);
+    info!("📞 Call     : {} -> {}", from, to);
+    info!("👻 Headless : {}", headless);
     info!("--------------------------------------------------");
 
     let (tx, mut rx) = mpsc::channel::<UacEvent>(100);
 
     info!("⚙️  Initializing Telecom Engine...");
-    let client = TelecomClient::new(tx, args.headless);
+    let client = TelecomClient::new(tx, headless);
 
-    // Event Loop
+    // 2. EVENT DİNLEYİCİ (Arka plan log ve state takibi)
     let event_handler = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 UacEvent::Log(msg) => {
-                    // SIP paket loglarını sadece Debug modda veya özel durumlarda bas
-                    // Ancak SDK'dan gelen önemli logları her zaman göster
-                    if !msg.contains("[SIP_PACKET") {
-                        info!("🔹 {}", msg); 
-                    } else {
-                        // Paketleri debug seviyesinde tut
-                        tracing::debug!("{}", msg);
-                    }
+                    if !msg.contains("[SIP_PACKET") { info!("🔹 {}", msg); } 
+                    else { tracing::debug!("{}", msg); }
                 }
                 UacEvent::CallStateChanged(state) => {
                     info!("🔔 CALL STATE: {:?}", state);
@@ -96,7 +101,6 @@ async fn main() -> anyhow::Result<()> {
                     info!("🎙️  MEDIA ACTIVE: 2-Way Audio Flow Established!");
                 }
                 UacEvent::RtpStats { rx_cnt, tx_cnt } => {
-                     // Her ~2 saniyede bir istatistik bas
                      if rx_cnt % 100 == 0 || tx_cnt % 100 == 0 {
                          info!("📊 RTP Stats: RX={} | TX={}", rx_cnt, tx_cnt);
                      }
@@ -105,21 +109,42 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    info!("🚀 Dialing...");
-    if let Err(e) = client.start_call(args.target_ip, args.port, args.to, args.from).await {
-        error!("🔥 Failed to start call: {}", e);
+    info!("🚀 Arama Başlatılıyor...");
+    if let Err(e) = client.start_call(target_ip.clone(), port, to.clone(), from.clone()).await {
+        error!("🔥 Arama başlatılamadı: {}", e);
         process::exit(1);
     }
 
-    // Graceful Shutdown (Ctrl+C)
-    tokio::select! {
-        _ = tokio::signal::ctrl_c() => {
-            warn!("🛑 User interrupted. Sending BYE...");
-            let _ = client.end_call().await;
-            // BYE gitmesi için kısa bir süre bekle
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    // 3. OTONOM SENARYO İŞLETİMİ VEYA MANUEL BEKLEME
+    if let Some(actions) = actions {
+        for action in actions {
+            match action {
+                ActionDef::Wait { ms } => {
+                    info!("⏳ Senaryo: {}ms bekleniyor...", ms);
+                    tokio::time::sleep(Duration::from_millis(ms)).await;
+                },
+                ActionDef::Dtmf { key } => {
+                    info!("🎹 Senaryo: '{}' tuşuna basılıyor...", key);
+                    let _ = client.send_dtmf(key).await;
+                },
+                ActionDef::Hangup => {
+                    info!("🛑 Senaryo: Çağrı sonlandırılıyor (Hangup)...");
+                    let _ = client.end_call().await;
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                    break;
+                }
+            }
         }
-        _ = event_handler => {}
+    } else {
+        // Senaryo yoksa, kullanıcı manuel olarak Ctrl+C yapana kadar bekle
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                warn!("🛑 User interrupted. Sending BYE...");
+                let _ = client.end_call().await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            _ = event_handler => {}
+        }
     }
 
     Ok(())
