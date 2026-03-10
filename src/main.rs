@@ -53,14 +53,20 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let log_level = if args.debug { Level::DEBUG } else { Level::INFO };
-    tracing_subscriber::fmt().with_max_level(log_level).without_time().init();
+    
+    // [MİMARİ DÜZELTME]: .without_time() KALDIRILDI. Zaman damgası analiz için zorunludur.
+    tracing_subscriber::fmt().with_max_level(log_level).init();
 
     // 1. KULLANIM MODUNU BELİRLE VE PARAMETRELERİ AYARLA
     let (target_ip, port, to, from, headless, actions) = if let Some(scenario_path) = args.scenario {
         info!("📂 Senaryo dosyası yükleniyor: {}", scenario_path);
         let sc = load_scenario(&scenario_path)?;
         info!("🤖 AKTİF SENARYO: {}", sc.name);
-        (sc.target_ip, sc.port, sc.to, sc.from, sc.headless, Some(sc.actions))
+        
+        // Eğer CLI'dan IP geçildiyse senaryodaki IP'yi ez (Dinamik test hedefi için)
+        let final_ip = if let Some(cli_ip) = args.target_ip { cli_ip } else { sc.target_ip };
+        
+        (final_ip, sc.port, sc.to, sc.from, sc.headless, Some(sc.actions))
     } else {
         (args.target_ip.unwrap(), args.port, args.to, args.from, args.headless, None)
     };

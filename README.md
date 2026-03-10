@@ -1,25 +1,21 @@
-# 📠 Sentiric SIP UAC (CLI)
+# 📠 Sentiric SIP UAC (Autonomous Test Bot)
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![Core](https://img.shields.io/badge/sdk-v0.3.13-orange.svg)]()
+[![Core](https://img.shields.io/badge/sdk-v0.3.39-orange.svg)]()
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)]()
 
-**Sentiric SIP UAC**, sunucu tarafı SIP/RTP uygulamalarını (SBC, B2BUA, Media Server) test etmek için tasarlanmış, Rust tabanlı, yüksek performanslı bir komut satırı aracıdır.
+**Sentiric SIP UAC**, sunucu tarafı SIP/RTP uygulamalarını (SBC, B2BUA, Media Server) stres, dayanıklılık ve mantık testlerine tabi tutmak için tasarlanmış, otonom bir komut satırı aracıdır.
 
-Mobil sürümün aksine, bu araç **Arayüzsüz (Headless)** ortamlarda çalışmak üzere optimize edilmiştir.
+JSON tabanlı **Senaryo Motoru** sayesinde, Race Condition (Yarış Durumu), Packet Flood, Timeout ve Memory Leak gibi kritik testleri otomatize eder.
 
 ## 🌟 Temel Özellikler
 
-*   **Virtual DSP (Headless Mode):** Ses kartı olmayan sunucularda (CI/CD, Docker) çalışabilir.
-    *   **TX:** Yapay bir sinüs dalgası (440Hz) üretir ve gönderir.
-    *   **RX:** Gelen ses paketlerini decode eder ve sinyal seviyesini (RMS) ölçerek "Sesin gerçekten geldiğini" doğrular.
-*   **RFC 3261 Uyumlu:** Tam stateful SIP yığını (`INVITE`, `ACK`, `BYE`, `Auto-Reply`).
-*   **NAT Traversal:** Simetrik RTP ve Latching desteği.
-*   **Telemetri:** Gelişmiş RTP paket sayacı ve jitter analizi.
+*   **Autonomous Scenario Engine:** JSON dosyalarından test adımlarını (`wait`, `dtmf`, `hangup`) okur ve insan müdahalesi olmadan çalıştırır.
+*   **Virtual DSP (Headless Mode):** Ses kartı olmayan sunucularda (CI/CD, Docker) tam izolasyonla çalışır.
+*   **Resilience Test Suite:** Hazır bash scriptleri ile sistemi uç senaryolarla (Edge Cases) döver.
+*   **Telemetri:** Jitter analizi, milisaniye hassasiyetli state geçiş logları ve RTP paket sayacı.
 
 ## 🛠️ Kurulum
-
-### Yöntem 1: Kaynaktan Derleme (Rust Gerekir)
 
 ```bash
 # Bağımlılıkları yükle (Debian/Ubuntu)
@@ -29,50 +25,35 @@ sudo apt install libasound2-dev protobuf-compiler
 cargo build --release
 ```
 
-### Yöntem 2: Docker (Önerilen)
-
-```bash
-docker build -t sentiric-uac .
-```
-
 ## 💻 Kullanım
 
 ### Parametreler
 
 ```text
-Usage: sentiric-sip-uac [OPTIONS] <TARGET_IP>
+Usage: sentiric-sip-uac [OPTIONS] [TARGET_IP]
 
 Arguments:
-  <TARGET_IP>  Target IP Address (e.g., 34.122.40.122)
+  [TARGET_IP]  Hedef IP (Örn: 34.122.40.122). Senaryo modunda bile bu değer geçilirse, senaryodaki IP ezilir.
 
 Options:
   -p, --port <PORT>      SIP Port [default: 5060]
   -t, --to <TO>          Destination User [default: service]
   -f, --from <FROM>      Source User [default: cli-uac]
       --headless         Enable Headless Mode (Virtual DSP)
-      --debug            Enable Debug Logs (RMS Levels)
+      --debug            Enable Debug Logs (Shows SIP packets)
+  -s, --scenario <FILE>  Test senaryosunu çalıştırır (JSON formatında)
   -h, --help             Print help
 ```
 
-### Senaryolar
+### 🛡️ Dayanıklılık Testini Başlatmak (Resilience Suite)
 
-#### 1. Manuel Echo Testi (Laptop/PC)
-Kendi bilgisayarınızdan, donanım ses kartını kullanarak test yapın.
+Sistemin kararlılığını test etmek için tüm zorlu senaryoları sırayla çalıştıran scripti kullanın. **DİKKAT: Gerçek SBC veya Proxy IP'nizi vermelisiniz!** `127.0.0.1` yazarsanız test sadece UAC'nin kendi timeout mekanizmasını test eder, sunucuyu test etmez.
+
 ```bash
-./target/release/sentiric-sip-uac 34.122.40.122 --port 5060 --to 9999
+# Örnek: GCP Edge SBC Sunucusuna stres testi yap
+./scripts/resilience_suite.sh 34.122.40.122
 ```
 
-#### 2. Otomasyon Testi (CI/CD & Docker)
-Ses kartı olmayan bir sunucuda, sesin gidip geldiğini (RMS seviyeleriyle) doğrulayın.
-```bash
-# --debug flag'i RMS loglarını açar
-./target/release/sentiric-sip-uac 34.122.40.122 --headless --debug
-```
-*Beklenen Çıktı (Debug Mod):*
-> `DEBUG ... [Headless RX] Voice Signal Detected! Level: 1245.32`
-
----
-© 2026 Sentiric Team | GNU AGPL-3.0 License
-
+Daha fazla detay için `docs/TESTING.md` dosyasına bakınız.
 
 ---
