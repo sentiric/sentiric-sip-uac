@@ -1,0 +1,26 @@
+{
+  "name": "RTP Stress Test - Rapid DTMF Spam",
+  "target_ip": "127.0.0.1",
+  "port": 5060,
+  "to": "9999",
+  "from": "stress-bot",
+  "headless": true,
+  "actions": [
+    { "type": "wait", "ms": 2000 },
+    { "type": "dtmf", "key": "1" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "2" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "3" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "4" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "5" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "*" },
+    { "type": "wait", "ms": 100 },
+    { "type": "dtmf", "key": "#" },
+    { "type": "wait", "ms": 2000 },
+    { "type": "hangup" }
+  ]
+}

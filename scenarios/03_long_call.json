@@ -1,0 +1,12 @@
+{
+  "name": "Memory Leak & Jitter Buffer Test - Long Call",
+  "target_ip": "127.0.0.1",
+  "port": 5060,
+  "to": "9999",
+  "from": "marathon-bot",
+  "headless": true,
+  "actions": [
+    { "type": "wait", "ms": 60000 },
+    { "type": "hangup" }
+  ]
+}
