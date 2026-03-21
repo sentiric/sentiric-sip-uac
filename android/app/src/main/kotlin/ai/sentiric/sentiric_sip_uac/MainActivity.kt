@@ -1,5 +1,4 @@
-// sentiric-sip-mobile-uac/android/app/src/main/kotlin/ai/sentiric/sentiric_mobile_sip_uac/MainActivity.kt
-package ai.sentiric.sentiric_mobile_sip_uac
+package ai.sentiric.sentiric_sip_uac
 
 import android.content.Context
 import android.media.AudioManager
@@ -9,7 +8,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "ai.sentiric.mobile/audio_route"
+    private val CHANNEL = "ai.sentiric.sentiric_sip_uac/audio_route"
     private lateinit var audioManager: AudioManager
     private var previousMusicVolume: Int = 0
     private var previousMode: Int = AudioManager.MODE_NORMAL
@@ -20,9 +19,9 @@ class MainActivity: FlutterActivity() {
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         try {
-            System.loadLibrary("mobile_uac")
+            System.loadLibrary("uac")
         } catch (e: UnsatisfiedLinkError) {
-            android.util.Log.e("SentiricMobile", "Failed to load Rust Native Library", e)
+            android.util.Log.e("UAC", "Failed to load Rust Native Library", e)
         }
     }
 

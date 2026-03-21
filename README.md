@@ -1,10 +1,12 @@
-# 📱 Sentiric Field UAC (Mobile)
+# 📱 Sentiric Sip UAC
 
 [![Status](https://img.shields.io/badge/status-production--ready-green.svg)]()
 [![Core](https://img.shields.io/badge/core-Rust%20v1.75%2B-orange.svg)]()
 [![UI](https://img.shields.io/badge/ui-Flutter%20v3.10%2B-blue.svg)]()
 
-**Sentiric Field UAC**, telekomünikasyon altyapılarını (SBC, IMS, VoLTE/VoNR) saha koşullarında test etmek için geliştirilmiş, yüksek performanslı bir mobil SIP istemcisidir. 
+**Sentiric Sip UAC**, Saha koşullarında (4G/5G, NAT arkası) telekomünikasyon altyapılarını (SBC, IMS, VoLTE) 
+    stres, ses kalitesi (Raw Audio) ve mantık testlerine tabi tutmak için geliştirilmiş, 
+    Flutter (UI) ve Rust (Core) tabanlı (mobile,linux,browser) uç (Edge) SIP istemcisi ve teşhis aracıdır.
 
 Sıradan bir "Softphone" değildir; ağ gecikmesi, paket kaybı ve NAT davranışlarını analiz etmek için **"Raw Audio" (Ham Ses)** motoru üzerine kurulmuştur.
 

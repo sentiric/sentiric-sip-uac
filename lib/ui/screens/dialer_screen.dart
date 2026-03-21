@@ -65,7 +65,7 @@ class DialerScreen extends StatelessWidget {
       builder: (context, child) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('SENTIRIC UAC', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 3.0)),
+            title: const Text('SIP UAC', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 3.0)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,

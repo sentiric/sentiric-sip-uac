@@ -1,7 +1,7 @@
 .PHONY: setup generate sync-sdk build-android run-android deploy-device clean-android clean-all
 
 # ==============================================================================
-# SENTIRIC MOBILE UAC - ORCHESTRATION MAKEFILE (v2.1 - Strict Sync)
+# SENTIRIC SIP UAC - ORCHESTRATION MAKEFILE (v2.1 - Strict Sync)
 # ==============================================================================
 
 # 1. İlk kurulum (SDK'lar ve araçlar için)

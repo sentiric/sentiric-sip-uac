@@ -1,4 +1,4 @@
-# 🗺️ Sentiric Mobile UAC - Yol Haritası
+# 🗺️ Sentiric Sip UAC - Yol Haritası
 
 ## 🟢 Faz 1: MVP & Stabilite (TAMAMLANDI v1.1.0)
 - [x] SIP Kayıt ve Arama Başlatma/Sonlandırma.

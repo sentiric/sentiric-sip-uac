@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sentiric_sip_mobile_uac/src/rust/api/simple.dart';
-import 'package:sentiric_sip_mobile_uac/telecom_telemetry.dart';
+import 'package:sentiric_sip_uac/src/rust/api/simple.dart';
+import 'package:sentiric_sip_uac/telecom_telemetry.dart';
 
 class CallController extends ChangeNotifier {
-  static const platform = MethodChannel('ai.sentiric.mobile/audio_route');
+  static const platform = MethodChannel('ai.sentiric.sentiric_sip_uac/audio_route');
 
   // Input Controllers
   final TextEditingController ipController = TextEditingController();
@@ -39,9 +39,9 @@ class CallController extends ChangeNotifier {
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     ipController.text = prefs.getString('targetIp') ?? "";
-    portController.text = prefs.getString('targetPort') ?? "5060";
-    toController.text = prefs.getString('toUser') ?? "9999";
-    fromController.text = prefs.getString('fromUser') ?? "field-uac";
+    portController.text = prefs.getString('targetPort') ?? "";
+    toController.text = prefs.getString('toUser') ?? "";
+    fromController.text = prefs.getString('fromUser') ?? "";
     notifyListeners();
   }
 

@@ -3,8 +3,8 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sentiric_sip_mobile_uac/src/rust/api/simple.dart';
-import 'package:sentiric_sip_mobile_uac/src/rust/frb_generated.dart';
+import 'package:sentiric_sip_uac/src/rust/api/simple.dart';
+import 'package:sentiric_sip_uac/src/rust/frb_generated.dart';
 import 'controllers/call_controller.dart';
 import 'ui/screens/dialer_screen.dart';
 
@@ -28,7 +28,7 @@ class SentiricApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sentiric Field UAC',
+      title: 'Sip UAC',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF000000), 
@@ -80,7 +80,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.radar), label: "Field Test"),
+          BottomNavigationBarItem(icon: Icon(Icons.radar), label: ""),
           BottomNavigationBarItem(icon: Icon(Icons.tune), label: "DSP Tuning"),
         ],
       ),

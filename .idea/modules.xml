@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/sentiric_mobile_sip_uac.iml" filepath="$PROJECT_DIR$/sentiric_mobile_sip_uac.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android/sentiric_mobile_sip_uac_android.iml" filepath="$PROJECT_DIR$/android/sentiric_mobile_sip_uac_android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sentiric_sip_uac.iml" filepath="$PROJECT_DIR$/sentiric_sip_uac.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android/sentiric_sip_uac_android.iml" filepath="$PROJECT_DIR$/android/sentiric_sip_uac_android.iml" />
     </modules>
   </component>
 </project>

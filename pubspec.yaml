@@ -1,9 +1,8 @@
-name: sentiric_sip_mobile_uac
+name: sentiric_sip_uac
 description: "Sentiric Mobile SIP UAC for field testing and validation."
 publish_to: 'none'
 
-# sentiric-sip-mobile-uac/pubspec.yaml
-version: 1.2.4+6
+version: 1.2.5+7
 
 environment:
   sdk: ^3.10.4
@@ -33,5 +32,4 @@ flutter:
 
 flutter_launcher_icons:
   android: true
-  ios: true
   image_path: "assets/icon.png"

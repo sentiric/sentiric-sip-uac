@@ -1,4 +1,4 @@
-// sentiric-sip-mobile-uac/rust/src/api/simple.rs
+// rust/src/api/simple.rs
 
 use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; 
 use crate::frb_generated::StreamSink;
@@ -33,7 +33,7 @@ pub fn init_logger() {
             .with_max_level(LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    log::info!("✅ Mobile Logger Initialized via SDK v2.0 with STRICT PCMU codec.");
+    log::info!("✅ Logger Initialized via SDK v2.0 with STRICT PCMU codec.");
 }
 
 /// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
@@ -56,7 +56,7 @@ pub async fn start_sip_call(
     sink: StreamSink<String>, 
 ) -> anyhow::Result<()> {
     
-    info!("🚀 Mobile Dialing: {} -> {}:{}", from_user, target_ip, target_port);
+    info!("🚀 Dialing: {} -> {}:{}", from_user, target_ip, target_port);
     let _ = sink.add(format!("Log(\"🚀 Starting Engine for {}:{}...\")", target_ip, target_port));
 
     let (event_tx, mut event_rx) = mpsc::channel::<UacEvent>(100);
