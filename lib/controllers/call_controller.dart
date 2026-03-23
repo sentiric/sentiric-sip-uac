@@ -1,5 +1,6 @@
 // Dosya: sentiric-sip-uac/lib/controllers/call_controller.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -92,11 +93,13 @@ class CallController extends ChangeNotifier {
     _scrollToBottom();
   }
 
-  Future<void> toggleSpeaker() async {
+Future<void> toggleSpeaker() async {
     isSpeakerOn = !isSpeakerOn;
     notifyListeners();
     try {
-      await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn});
+      if (Platform.isAndroid || Platform.isIOS) {
+        await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn});
+      }
     } catch (e) {
       debugPrint("Speaker Toggle Error: $e");
     }
@@ -219,17 +222,24 @@ class CallController extends ChangeNotifier {
     await saveProfile();
     await initEngineIfNeeded();
 
-    PermissionStatus status = await Permission.microphone.status;
-    if (!status.isGranted) status = await Permission.microphone.request();
+    // Sadece mobilde mikrofon izni iste
+    if (Platform.isAndroid || Platform.isIOS) {
+      PermissionStatus status = await Permission.microphone.status;
+      if (!status.isGranted) status = await Permission.microphone.request();
 
-    if (!status.isGranted) {
-      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
-      notifyListeners();
-      return;
+      if (!status.isGranted) {
+        _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
+        notifyListeners();
+        return;
+      }
     }
 
     isSpeakerOn = false;
-    try { await platform.invokeMethod('setInCallMode'); } catch (e) { debugPrint("InCall Mode Error: $e"); }
+    try { 
+      if (Platform.isAndroid || Platform.isIOS) {
+        await platform.invokeMethod('setInCallMode'); 
+      }
+    } catch (e) { debugPrint("InCall Mode Error: $e"); }
 
     telemetryLogs.clear();
     isCalling = true;
@@ -250,22 +260,30 @@ class CallController extends ChangeNotifier {
     } catch (e) {
       _processEvent("Error(\"Call Fail: $e\")");
       isCalling = false;
-      platform.invokeMethod('setNormalMode').catchError((_) {});
+      if (Platform.isAndroid || Platform.isIOS) {
+        platform.invokeMethod('setNormalMode').catchError((_) {});
+      }
       notifyListeners();
     }
   }
 
   // [YENİ]: Gelen Aramayı Cevapla
   Future<void> answerCall() async {
-    PermissionStatus status = await Permission.microphone.status;
-    if (!status.isGranted) status = await Permission.microphone.request();
+    if (Platform.isAndroid || Platform.isIOS) {
+      PermissionStatus status = await Permission.microphone.status;
+      if (!status.isGranted) status = await Permission.microphone.request();
 
-    if (!status.isGranted) {
-      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
-      return rejectCall(); // Mikrofon izni yoksa doğrudan kapat
+      if (!status.isGranted) {
+        _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
+        return rejectCall(); 
+      }
     }
 
-    try { await platform.invokeMethod('setInCallMode'); } catch (e) { debugPrint("InCall Mode Error: $e"); }
+    try { 
+      if (Platform.isAndroid || Platform.isIOS) {
+        await platform.invokeMethod('setInCallMode'); 
+      }
+    } catch (e) { debugPrint("InCall Mode Error: $e"); }
     
     sipStatus = "ANSWERING...";
     notifyListeners();
@@ -296,7 +314,9 @@ class CallController extends ChangeNotifier {
     isMediaFlowing = false;
     sipStatus = "TERMINATING...";
     _stopDurationTimer();
-    platform.invokeMethod('setNormalMode').catchError((_) {});
+    if (Platform.isAndroid || Platform.isIOS) {
+      platform.invokeMethod('setNormalMode').catchError((_) {});
+    }
     notifyListeners();
   }
 
