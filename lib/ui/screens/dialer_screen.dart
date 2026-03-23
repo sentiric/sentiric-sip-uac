@@ -1,4 +1,4 @@
-// Dosya: sentiric-sip-uac/lib/ui/screens/dialer_screen.dart
+// Dosya: lib/ui/screens/dialer_screen.dart
 import 'package:flutter/material.dart';
 import '../../controllers/call_controller.dart';
 import '../../telecom_telemetry.dart';
@@ -79,7 +79,6 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
-  // [MİMARİ DÜZELTME]: Linux Masaüstü taşmasını önlemek için SingleChildScrollView eklendi.
   Widget _buildDialpad(BuildContext context) {
     final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
     return LayoutBuilder(
@@ -131,7 +130,7 @@ class DialerScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20), // Ekranın altına boşluk
+                const SizedBox(height: 20), 
               ],
             ),
           ),
@@ -147,6 +146,7 @@ class DialerScreen extends StatelessWidget {
           children:[
             const Icon(Icons.ring_volume, size: 80, color: Color(0xFF00FF9D)),
             const SizedBox(height: 40),
+            // [MİMARİ DÜZELTME]: Arayanın temizlenmiş ismini (veya numarasını) göster
             Text(controller.incomingCaller, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w200, color: Colors.white)),
             const SizedBox(height: 80),
             Row(
@@ -167,7 +167,11 @@ class DialerScreen extends StatelessWidget {
           const SizedBox(height: 40),
           Column(
             children:[
-              Text(controller.currentCallTarget, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
+              // Giden aramada da rehberden isim çekme (opsiyonel bonus)
+              Text(
+                controller.activeContacts.where((c) => c.number == controller.currentCallTarget).firstOrNull?.name ?? controller.currentCallTarget, 
+                style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)
+              ),
               const SizedBox(height: 12),
               Text(controller.sipStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Color(0xFF00FF9D))),
               const SizedBox(height: 16),

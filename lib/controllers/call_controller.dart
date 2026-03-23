@@ -1,4 +1,4 @@
-// Dosya: sentiric-sip-uac/lib/controllers/call_controller.dart
+// Dosya: lib/controllers/call_controller.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -18,7 +18,6 @@ class CallController extends ChangeNotifier {
   List<CallRecord> _allHistory =[];
   SipProfile? activeProfile;
 
-  // --- İZOLASYON GETTER'LARI ---
   List<PhoneContact> get activeContacts => _allContacts.where((c) => c.profileId == activeProfile?.id).toList();
   List<CallRecord> get activeHistory => _allHistory.where((h) => h.profileId == activeProfile?.id).toList();
 
@@ -76,7 +75,6 @@ class CallController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- İZOLASYON EKLEME METODLARI ---
   void addContact(String name, String number) {
     if (activeProfile == null) return;
     _allContacts.add(PhoneContact(id: DateTime.now().millisecondsSinceEpoch.toString(), profileId: activeProfile!.id, name: name, number: number));
@@ -98,7 +96,7 @@ class CallController extends ChangeNotifier {
     if(isCalling) endCall();
     activeProfile = p;
     sipStatus = "STANDBY";
-    dialedNumber = ""; // Profil değişince arama numarasını da sıfırla
+    dialedNumber = ""; 
     saveState();
   }
 
@@ -126,18 +124,43 @@ class CallController extends ChangeNotifier {
     }
   }
 
+  //[MİMARİ DÜZELTME]: Gelen ham SIP Uri'sini temizler ve rehberde arar.
+  String _parseCallerId(String rawFrom) {
+    // rawFrom örneği: "<sip:2001@34.122.40.122>;tag=tag-f7d"
+    try {
+      final sipRegex = RegExp(r'sip:([^@>]+)');
+      final match = sipRegex.firstMatch(rawFrom);
+      String parsedNumber = match != null ? match.group(1)! : "Unknown";
+      
+      // Rehberde Ara
+      final contact = activeContacts.where((c) => c.number == parsedNumber).firstOrNull;
+      return contact != null ? contact.name : parsedNumber;
+    } catch (_) {
+      return "Unknown Caller";
+    }
+  }
+
   void _processEvent(String raw) {
     final entry = TelecomTelemetry.parse(raw);
 
     if (raw.contains("IncomingCall")) {
       final fromMatch = RegExp(r'from:\s*"([^"]+)"').firstMatch(raw);
-      incomingCaller = fromMatch?.group(1) ?? "Unknown";
+      final rawFrom = fromMatch?.group(1) ?? "Unknown";
+      
+      incomingCaller = _parseCallerId(rawFrom); // Temizle ve Eşleştir
+      
       sipStatus = "INCOMING CALL";
       isCalling = true; 
       isIncomingCall = true;
-      currentCallTarget = incomingCaller;
+      
+      // CDR kaydı için ham numara (isim değil, arayan numara)
+      final sipRegex = RegExp(r'sip:([^@>]+)');
+      final match = sipRegex.firstMatch(rawFrom);
+      currentCallTarget = match != null ? match.group(1)! : "Unknown";
+      
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(seconds: 1), () { if(sipStatus == "INCOMING CALL") HapticFeedback.heavyImpact(); });
+      
       _addLog(TelemetryEntry(message: "🔔 Incoming call from: $incomingCaller", level: TelemetryLevel.status));
       notifyListeners();
       return;
@@ -155,7 +178,6 @@ class CallController extends ChangeNotifier {
         _startDurationTimer();
       } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE" || sipStatus == "AUTHFAILED") {
         
-        // CDR İZOLASYON KAYDI
         if (isCalling && currentCallTarget.isNotEmpty && activeProfile != null) {
           _allHistory.insert(0, CallRecord(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -171,7 +193,7 @@ class CallController extends ChangeNotifier {
 
         isCalling = false;
         isMediaFlowing = false;
-        rxPackets = 0; // Arayüzü de sıfırla
+        rxPackets = 0; 
         txPackets = 0;
         _stopDurationTimer();
         platform.invokeMethod('setNormalMode').catchError((_) {});
