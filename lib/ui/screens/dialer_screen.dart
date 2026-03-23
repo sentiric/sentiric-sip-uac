@@ -1,3 +1,4 @@
+// Dosya: sentiric-sip-uac/lib/ui/screens/dialer_screen.dart
 import 'package:flutter/material.dart';
 import '../../controllers/call_controller.dart';
 import '../../telecom_telemetry.dart';
@@ -13,12 +14,12 @@ class DialerScreen extends StatelessWidget {
       backgroundColor: const Color(0xFF111111),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
-        final keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
+        final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
         return Container(
           padding: const EdgeInsets.all(24),
           height: 400,
           child: Column(
-            children: [
+            children:[
               const Text("DTMF KEYPAD", style: TextStyle(color: Color(0xFF00FF9D), letterSpacing: 2.0, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               Expanded(
@@ -69,7 +70,7 @@ class DialerScreen extends StatelessWidget {
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,
-            actions: [
+            actions:[
               IconButton(
                 onPressed: controller.toggleDebugConsole,
                 icon: Icon(Icons.terminal, color: controller.showDebugConsole ? const Color(0xFF00FF9D) : Colors.white30)
@@ -78,7 +79,7 @@ class DialerScreen extends StatelessWidget {
           ),
           body: SafeArea(
             child: Column(
-              children: [
+              children:[
                 if (!controller.isCalling) _buildDialerForm(),
                 if (controller.isCalling) Expanded(child: _buildActiveCallScreen(context)),
                 if (controller.showDebugConsole) Expanded(child: _buildConsole()),
@@ -97,17 +98,16 @@ class DialerScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // YENİ: MOD SEÇİCİ
             Center(
               child: ToggleButtons(
-                isSelected: [!controller.isTrunkMode, controller.isTrunkMode],
+                isSelected:[!controller.isTrunkMode, controller.isTrunkMode],
                 onPressed: (int index) => controller.setMode(index == 1),
                 borderRadius: BorderRadius.circular(8),
                 selectedColor: Colors.black,
                 fillColor: const Color(0xFF00FF9D),
                 color: Colors.white54,
                 constraints: const BoxConstraints(minHeight: 36, minWidth: 140),
-                children: const [
+                children: const[
                   Text("SIP ACCOUNT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   Text("RAW TRUNK", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 ],
@@ -117,7 +117,7 @@ class DialerScreen extends StatelessWidget {
 
             const Text("TARGET NODE", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             const SizedBox(height: 12),
-            Row(children: [
+            Row(children:[
               Expanded(flex: 3, child: _input(controller.ipController, controller.isTrunkMode ? "IP Address" : "Domain / SBC IP", Icons.dns, keyboardType: TextInputType.url)),
               const SizedBox(width: 8),
               Expanded(flex: 2, child: _input(controller.portController, "Port", Icons.numbers, isCompact: true, keyboardType: TextInputType.number)),
@@ -135,7 +135,6 @@ class DialerScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // AKSİYON DÜĞMELERİ
             if (controller.isTrunkMode) ...[
               const Text("DESTINATION", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
               const SizedBox(height: 12),
@@ -143,7 +142,6 @@ class DialerScreen extends StatelessWidget {
               const SizedBox(height: 30),
               _buildBigButton("INJECT CALL", Icons.rocket_launch, controller.makeCall, const Color(0xFF00FF9D)),
             ] else ...[
-              // SIP ACCOUNT MODU
               if (controller.sipStatus != "REGISTERED") ...[
                 const SizedBox(height: 20),
                 _buildBigButton("REGISTER", Icons.how_to_reg, controller.registerAccount, Colors.blueAccent),
@@ -156,7 +154,7 @@ class DialerScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [Icon(Icons.check_circle, color: Colors.green, size: 18), SizedBox(width: 8), Text("REGISTERED SECURELY", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))],
+                    children:[Icon(Icons.check_circle, color: Colors.green, size: 18), SizedBox(width: 8), Text("REGISTERED SECURELY", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))],
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -182,11 +180,11 @@ class DialerScreen extends StatelessWidget {
           color: color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color, width: 1.5),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 1)],
+          boxShadow:[BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 1)],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children:[
             Icon(icon, color: color, size: 24),
             const SizedBox(width: 16),
             Text(text, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
@@ -197,13 +195,18 @@ class DialerScreen extends StatelessWidget {
   }
 
   Widget _buildActiveCallScreen(BuildContext context) {
+    // [YENİ]: Gelen Arama Ekranı (Inbound Call UI)
+    if (controller.sipStatus == "INCOMING CALL") {
+        return _buildIncomingCallUI();
+    }
+
     Color statusColor = controller.sipStatus == "CONNECTED" ? const Color(0xFF00FF9D) : Colors.orangeAccent;
     
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         Column(
-          children: [
+          children:[
             Text(controller.toController.text, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
             const SizedBox(height: 12),
             Container(
@@ -226,7 +229,7 @@ class DialerScreen extends StatelessWidget {
           decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
+            children:[
               _statItem("TX (EGRESS)", "${controller.txPackets}", Colors.white70),
               Icon(Icons.compare_arrows, color: controller.isMediaFlowing ? const Color(0xFF00FF9D) : Colors.white24, size: 28),
               _statItem("RX (INGRESS)", "${controller.rxPackets}", Colors.white70),
@@ -236,7 +239,7 @@ class DialerScreen extends StatelessWidget {
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          children:[
             _actionBtn(Icons.mic_off, controller.isMuted ? "MUTED" : "MUTE", controller.isMuted, controller.toggleMute),
             const SizedBox(width: 20),
             _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
@@ -246,13 +249,13 @@ class DialerScreen extends StatelessWidget {
         ),
 
         GestureDetector(
-          onTap: controller.endCall, // DÜZELTİLDİ: Sadece kapatma
+          onTap: controller.endCall, 
           child: Container(
             height: 80, width: 80,
             decoration: const BoxDecoration(
               color: Colors.redAccent, 
               shape: BoxShape.circle, 
-              boxShadow: [BoxShadow(color: Color(0x66FF5252), blurRadius: 20, spreadRadius: 2)]
+              boxShadow:[BoxShadow(color: Color(0x66FF5252), blurRadius: 20, spreadRadius: 2)]
             ),
             child: const Icon(Icons.call_end, color: Colors.white, size: 36),
           ),
@@ -261,11 +264,58 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
+  // [YENİ]: Gelen Arama Ekranı Parçası
+  Widget _buildIncomingCallUI() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children:[
+        const Icon(Icons.ring_volume, size: 80, color: Color(0xFF00FF9D)),
+        const SizedBox(height: 40),
+        Text(
+          controller.incomingCaller, 
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w200, color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        const Text("INCOMING CALL", style: TextStyle(color: Color(0xFF00FF9D), letterSpacing: 4, fontWeight: FontWeight.bold, fontSize: 12)),
+        const SizedBox(height: 80),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children:[
+            _circleActionBtn(Icons.call_end, "REJECT", Colors.redAccent, controller.rejectCall),
+            _circleActionBtn(Icons.call, "ANSWER", const Color(0xFF00FF9D), controller.answerCall),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _circleActionBtn(IconData icon, String label, Color color, VoidCallback onTap) {
+    return Column(
+      children:[
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 70, width: 70,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Icon(icon, color: color, size: 30),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+      ],
+    );
+  }
+
   Widget _actionBtn(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
-        children: [
+        children:[
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -302,7 +352,7 @@ class DialerScreen extends StatelessWidget {
 
   Widget _statItem(String label, String val, Color color) {
     return Column(
-      children: [
+      children:[
         Text(label, style: const TextStyle(fontSize: 9, color: Colors.white30, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
         const SizedBox(height: 8),
         Text(val, style: TextStyle(fontSize: 20, color: color, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
@@ -318,13 +368,13 @@ class DialerScreen extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children:[
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: const Color(0xFF111111),
             child: const Row(
-              children: [
+              children:[
                 Icon(Icons.terminal, color: Colors.white30, size: 14),
                 SizedBox(width: 8),
                 Text("LIVE TELEMETRY STREAM", style: TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 1.5)),

@@ -1,3 +1,4 @@
+// Dosya: sentiric-sip-uac/lib/controllers/call_controller.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,13 +15,13 @@ class CallController extends ChangeNotifier {
   final TextEditingController portController = TextEditingController();
   final TextEditingController toController = TextEditingController();
   final TextEditingController fromController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController(); // YENİ: Şifre
+  final TextEditingController passwordController = TextEditingController();
 
   // Telemetry & UI State
-  final List<TelemetryEntry> telemetryLogs = [];
+  final List<TelemetryEntry> telemetryLogs =[];
   final ScrollController scrollController = ScrollController();
   
-  bool isTrunkMode = false; // YENİ: false = SIP Account, true = Raw Trunk
+  bool isTrunkMode = false;
   bool isCalling = false;
   bool isMediaFlowing = false;
   bool showDebugConsole = false;
@@ -32,6 +33,9 @@ class CallController extends ChangeNotifier {
   int txPackets = 0;
   int callDurationSeconds = 0;
   String sipStatus = "STANDBY";
+  
+  // [YENİ]: Gelen Arama İçin Kimlik Tutucu
+  String incomingCaller = "";
   
   Timer? _durationTimer;
 
@@ -76,7 +80,6 @@ class CallController extends ChangeNotifier {
 
   void setMode(bool trunkMode) {
     isTrunkMode = trunkMode;
-    // Mod değiştiğinde state sıfırla
     if (!isCalling) {
       sipStatus = "STANDBY";
       notifyListeners();
@@ -132,6 +135,22 @@ class CallController extends ChangeNotifier {
   void _processEvent(String raw) {
     final entry = TelecomTelemetry.parse(raw);
 
+    // [YENİ]: Gelen Arama Olayını Yakala (IncomingCall { from: "...", call_id: "..." })
+    if (raw.contains("IncomingCall")) {
+      final fromMatch = RegExp(r'from:\s*"([^"]+)"').firstMatch(raw);
+      incomingCaller = fromMatch?.group(1) ?? "Unknown Caller";
+      
+      sipStatus = "INCOMING CALL";
+      isCalling = true; 
+      
+      // HapticFeedback eklenebilir
+      HapticFeedback.heavyImpact();
+      
+      _addLog(TelemetryEntry(message: "🔔 Incoming call from: $incomingCaller", level: TelemetryLevel.status));
+      notifyListeners();
+      return;
+    }
+
     if (entry.level == TelemetryLevel.media && entry.rxCount != null) {
       rxPackets = entry.rxCount!;
       txPackets = entry.txCount!;
@@ -174,7 +193,8 @@ class CallController extends ChangeNotifier {
     }
   }
 
-  // YENİ: Hesap Kaydı (Şifreli)
+  // --- ARAMA İŞLEMLERİ ---
+
   Future<void> registerAccount() async {
     await saveProfile();
     await initEngineIfNeeded();
@@ -194,7 +214,6 @@ class CallController extends ChangeNotifier {
     }
   }
 
-  // YENİ: Çağrı Başlatma (Trunk veya Kayıtlı)
   Future<void> makeCall() async {
     if (isCalling) return;
     await saveProfile();
@@ -236,7 +255,40 @@ class CallController extends ChangeNotifier {
     }
   }
 
-  // Kapatma
+  // [YENİ]: Gelen Aramayı Cevapla
+  Future<void> answerCall() async {
+    PermissionStatus status = await Permission.microphone.status;
+    if (!status.isGranted) status = await Permission.microphone.request();
+
+    if (!status.isGranted) {
+      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
+      return rejectCall(); // Mikrofon izni yoksa doğrudan kapat
+    }
+
+    try { await platform.invokeMethod('setInCallMode'); } catch (e) { debugPrint("InCall Mode Error: $e"); }
+    
+    sipStatus = "ANSWERING...";
+    notifyListeners();
+    
+    try {
+      await acceptInboundCall();
+    } catch (e) {
+      _processEvent("Error(\"Answer Fail: $e\")");
+    }
+  }
+
+  // [YENİ]: Gelen Aramayı Reddet
+  Future<void> rejectCall() async {
+    try {
+      await rejectInboundCall();
+      sipStatus = "REJECTED";
+      isCalling = false;
+      notifyListeners();
+    } catch (e) {
+      _processEvent("Error(\"Reject Fail: $e\")");
+    }
+  }
+
   Future<void> endCall() async {
     if (!isCalling) return;
     await endSipCall();

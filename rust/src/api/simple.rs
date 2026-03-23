@@ -1,4 +1,4 @@
-// rust/src/api/simple.rs
+// Dosya: sentiric-sip-uac/rust/src/api/simple.rs
 
 use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; 
 use crate::frb_generated::StreamSink;
@@ -33,7 +33,7 @@ pub fn init_logger() {
     log::info!("✅ Logger Initialized via SDK v2.0 with STRICT PCMU codec.");
 }
 
-/// 1. Motoru Arka Planda Başlatır ve Sürekli Dinler (YENİ)
+/// 1. Motoru Arka Planda Başlatır ve Sürekli Dinler
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     let mut cmd_tx_guard = CMD_TX.lock().unwrap();
     if cmd_tx_guard.is_some() {
@@ -63,7 +63,7 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 2. SIP Hesabı ile Kayıt İşlemi (YENİ)
+/// 2. SIP Hesabı ile Kayıt İşlemi
 pub async fn register_sip_account(target_ip: String, target_port: u16, user: String, password: String) -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
@@ -74,7 +74,7 @@ pub async fn register_sip_account(target_ip: String, target_port: u16, user: Str
     Ok(())
 }
 
-/// 3. Aramayı Başlatma (Güncellendi: Artık Stream döndürmez, komut atar)
+/// 3. Aramayı Başlatma (Giden Arama)
 pub async fn start_sip_call(target_ip: String, target_port: u16, to_user: String, from_user: String) -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
@@ -83,7 +83,27 @@ pub async fn start_sip_call(target_ip: String, target_port: u16, to_user: String
     Ok(())
 }
 
-/// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
+/// [YENİ]: 4. Gelen Aramayı Kabul Et (Answer)
+pub async fn accept_inbound_call() -> anyhow::Result<()> {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(ClientCommand::AcceptCall).await;
+        log::info!("📱 UI accepted incoming call.");
+    }
+    Ok(())
+}
+
+/// [YENİ]: 5. Gelen Aramayı Reddet (Decline)
+pub async fn reject_inbound_call() -> anyhow::Result<()> {
+    let tx_opt = CMD_TX.lock().unwrap().clone();
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(ClientCommand::RejectCall).await;
+        log::info!("🚫 UI rejected incoming call.");
+    }
+    Ok(())
+}
+
+/// Çağrıyı kesmek için Flutter tarafından çağrılır.
 pub async fn end_sip_call() -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {

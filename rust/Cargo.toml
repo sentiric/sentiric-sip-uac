@@ -1,6 +1,6 @@
 [package]
 name = "uac"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2021"
 
 [lib]
@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.41" }
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.42" }
 
 flutter_rust_bridge = "=2.11.1"
 tokio = { version = "1", features = ["full"] }
