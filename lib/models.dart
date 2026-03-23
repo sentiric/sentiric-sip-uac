@@ -18,22 +18,24 @@ class SipProfile {
 
 class PhoneContact {
   String id;
+  String profileId; // PROFIL İZOLASYONU
   String name;
   String number;
-  PhoneContact({required this.id, required this.name, required this.number});
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'number': number};
-  factory PhoneContact.fromJson(Map<String, dynamic> json) => PhoneContact(id: json['id']??'', name: json['name']??'', number: json['number']??'');
+  PhoneContact({required this.id, required this.profileId, required this.name, required this.number});
+  Map<String, dynamic> toJson() => {'id': id, 'profileId': profileId, 'name': name, 'number': number};
+  factory PhoneContact.fromJson(Map<String, dynamic> json) => PhoneContact(id: json['id']??'', profileId: json['profileId']??'default', name: json['name']??'', number: json['number']??'');
 }
 
 class CallRecord {
   String id;
+  String profileId; // PROFIL İZOLASYONU
   String targetNumber;
-  String direction; // IN, OUT
-  String status;    // ANSWERED, REJECTED, MISSED
+  String direction; 
+  String status;    
   int durationSeconds;
   DateTime timestamp;
 
-  CallRecord({required this.id, required this.targetNumber, required this.direction, required this.status, required this.durationSeconds, required this.timestamp});
-  Map<String, dynamic> toJson() => {'id': id, 'targetNumber': targetNumber, 'direction': direction, 'status': status, 'durationSeconds': durationSeconds, 'timestamp': timestamp.toIso8601String()};
-  factory CallRecord.fromJson(Map<String, dynamic> json) => CallRecord(id: json['id']??'', targetNumber: json['targetNumber']??'', direction: json['direction']??'', status: json['status']??'', durationSeconds: json['durationSeconds']??0, timestamp: DateTime.parse(json['timestamp']));
+  CallRecord({required this.id, required this.profileId, required this.targetNumber, required this.direction, required this.status, required this.durationSeconds, required this.timestamp});
+  Map<String, dynamic> toJson() => {'id': id, 'profileId': profileId, 'targetNumber': targetNumber, 'direction': direction, 'status': status, 'durationSeconds': durationSeconds, 'timestamp': timestamp.toIso8601String()};
+  factory CallRecord.fromJson(Map<String, dynamic> json) => CallRecord(id: json['id']??'', profileId: json['profileId']??'default', targetNumber: json['targetNumber']??'', direction: json['direction']??'', status: json['status']??'', durationSeconds: json['durationSeconds']??0, timestamp: DateTime.parse(json['timestamp']));
 }

@@ -14,12 +14,15 @@ class CallController extends ChangeNotifier {
   static const platform = MethodChannel('ai.sentiric.sentiric_sip_uac/audio_route');
 
   List<SipProfile> profiles =[];
-  List<PhoneContact> contacts = [];
-  List<CallRecord> callHistory =[];
+  List<PhoneContact> _allContacts = [];
+  List<CallRecord> _allHistory =[];
   SipProfile? activeProfile;
 
+  // --- İZOLASYON GETTER'LARI ---
+  List<PhoneContact> get activeContacts => _allContacts.where((c) => c.profileId == activeProfile?.id).toList();
+  List<CallRecord> get activeHistory => _allHistory.where((h) => h.profileId == activeProfile?.id).toList();
+
   String dialedNumber = "";
-  
   final List<TelemetryEntry> telemetryLogs =[];
   final ScrollController scrollController = ScrollController();
   
@@ -38,7 +41,6 @@ class CallController extends ChangeNotifier {
   String incomingCaller = "";
   String currentCallTarget = "";
   bool isIncomingCall = false;
-  
   Timer? _durationTimer;
 
   CallController() { _initStorage(); }
@@ -51,16 +53,16 @@ class CallController extends ChangeNotifier {
       profiles = (jsonDecode(profData) as List).map((x) => SipProfile.fromJson(x)).toList();
     }
     if (profiles.isEmpty) {
-      profiles.add(SipProfile(id: '1', name: 'Default Setup', ip: '', port: '5060', user: '', password: '', isTrunk: false));
+      profiles.add(SipProfile(id: 'default', name: 'Local Test', ip: '127.0.0.1', port: '5060', user: '1000', password: '123', isTrunk: false));
     }
     final lastProf = prefs.getString('active_profile') ?? profiles.first.id;
     activeProfile = profiles.firstWhere((p) => p.id == lastProf, orElse: () => profiles.first);
 
     final contData = prefs.getString('contacts');
-    if (contData != null) contacts = (jsonDecode(contData) as List).map((x) => PhoneContact.fromJson(x)).toList();
+    if (contData != null) _allContacts = (jsonDecode(contData) as List).map((x) => PhoneContact.fromJson(x)).toList();
 
     final histData = prefs.getString('history');
-    if (histData != null) callHistory = (jsonDecode(histData) as List).map((x) => CallRecord.fromJson(x)).toList();
+    if (histData != null) _allHistory = (jsonDecode(histData) as List).map((x) => CallRecord.fromJson(x)).toList();
 
     notifyListeners();
   }
@@ -68,16 +70,35 @@ class CallController extends ChangeNotifier {
   Future<void> saveState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('profiles', jsonEncode(profiles.map((e) => e.toJson()).toList()));
-    await prefs.setString('contacts', jsonEncode(contacts.map((e) => e.toJson()).toList()));
-    await prefs.setString('history', jsonEncode(callHistory.map((e) => e.toJson()).toList()));
+    await prefs.setString('contacts', jsonEncode(_allContacts.map((e) => e.toJson()).toList()));
+    await prefs.setString('history', jsonEncode(_allHistory.map((e) => e.toJson()).toList()));
     if (activeProfile != null) await prefs.setString('active_profile', activeProfile!.id);
     notifyListeners();
+  }
+
+  // --- İZOLASYON EKLEME METODLARI ---
+  void addContact(String name, String number) {
+    if (activeProfile == null) return;
+    _allContacts.add(PhoneContact(id: DateTime.now().millisecondsSinceEpoch.toString(), profileId: activeProfile!.id, name: name, number: number));
+    saveState();
+  }
+
+  void removeContact(String id) {
+    _allContacts.removeWhere((c) => c.id == id);
+    saveState();
+  }
+
+  void clearActiveHistory() {
+    if (activeProfile == null) return;
+    _allHistory.removeWhere((h) => h.profileId == activeProfile!.id);
+    saveState();
   }
 
   void loadProfile(SipProfile p) {
     if(isCalling) endCall();
     activeProfile = p;
     sipStatus = "STANDBY";
+    dialedNumber = ""; // Profil değişince arama numarasını da sıfırla
     saveState();
   }
 
@@ -111,15 +132,12 @@ class CallController extends ChangeNotifier {
     if (raw.contains("IncomingCall")) {
       final fromMatch = RegExp(r'from:\s*"([^"]+)"').firstMatch(raw);
       incomingCaller = fromMatch?.group(1) ?? "Unknown";
-      
       sipStatus = "INCOMING CALL";
       isCalling = true; 
       isIncomingCall = true;
       currentCallTarget = incomingCaller;
-      
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(seconds: 1), () { if(sipStatus == "INCOMING CALL") HapticFeedback.heavyImpact(); });
-      
       _addLog(TelemetryEntry(message: "🔔 Incoming call from: $incomingCaller", level: TelemetryLevel.status));
       notifyListeners();
       return;
@@ -137,9 +155,11 @@ class CallController extends ChangeNotifier {
         _startDurationTimer();
       } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE" || sipStatus == "AUTHFAILED") {
         
-        if (isCalling && currentCallTarget.isNotEmpty) {
-          callHistory.insert(0, CallRecord(
+        // CDR İZOLASYON KAYDI
+        if (isCalling && currentCallTarget.isNotEmpty && activeProfile != null) {
+          _allHistory.insert(0, CallRecord(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
+            profileId: activeProfile!.id,
             targetNumber: currentCallTarget,
             direction: isIncomingCall ? "IN" : "OUT",
             status: callDurationSeconds > 0 ? "ANSWERED" : (isIncomingCall ? "MISSED" : "REJECTED"),
@@ -151,6 +171,8 @@ class CallController extends ChangeNotifier {
 
         isCalling = false;
         isMediaFlowing = false;
+        rxPackets = 0; // Arayüzü de sıfırla
+        txPackets = 0;
         _stopDurationTimer();
         platform.invokeMethod('setNormalMode').catchError((_) {});
       }
@@ -161,23 +183,12 @@ class CallController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleDebugConsole() {
-    showDebugConsole = !showDebugConsole;
-    notifyListeners();
-    _scrollToBottom();
-  }
-
-  void _addLog(TelemetryEntry entry) {
-    telemetryLogs.add(entry);
-    _scrollToBottom();
-  }
-
+  void toggleDebugConsole() { showDebugConsole = !showDebugConsole; notifyListeners(); _scrollToBottom(); }
+  void _addLog(TelemetryEntry entry) { telemetryLogs.add(entry); _scrollToBottom(); }
   void _scrollToBottom() {
     if (showDebugConsole && scrollController.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(scrollController.position.maxScrollExtent + 50, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-        }
+        if (scrollController.hasClients) scrollController.animateTo(scrollController.position.maxScrollExtent + 50, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
       });
     }
   }
@@ -185,14 +196,10 @@ class CallController extends ChangeNotifier {
   void _startDurationTimer() {
     callDurationSeconds = 0;
     _durationTimer?.cancel();
-    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      callDurationSeconds++;
-      notifyListeners();
-    });
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) { callDurationSeconds++; notifyListeners(); });
   }
 
   void _stopDurationTimer() => _durationTimer?.cancel();
-
   String get formattedDuration {
     final minutes = (callDurationSeconds / 60).floor();
     final seconds = callDurationSeconds % 60;
@@ -200,18 +207,11 @@ class CallController extends ChangeNotifier {
   }
 
   Future<void> registerAccount() async {
-    if (activeProfile == null || activeProfile!.ip.isEmpty) return;
+    if (activeProfile == null || activeProfile!.ip.isEmpty || activeProfile!.isTrunk) return;
     await initEngineIfNeeded();
     sipStatus = "REGISTERING...";
     notifyListeners();
-    try {
-      await registerSipAccount(
-        targetIp: activeProfile!.ip,
-        targetPort: int.tryParse(activeProfile!.port) ?? 5060,
-        user: activeProfile!.user,
-        password: activeProfile!.password,
-      );
-    } catch (e) { _processEvent("Error(\"Register Fail: $e\")"); }
+    try { await registerSipAccount(targetIp: activeProfile!.ip, targetPort: int.tryParse(activeProfile!.port) ?? 5060, user: activeProfile!.user, password: activeProfile!.password); } catch (e) {}
   }
 
   Future<void> makeCall(String targetNumber) async {
@@ -227,8 +227,7 @@ class CallController extends ChangeNotifier {
     currentCallTarget = targetNumber;
     isIncomingCall = false;
     isSpeakerOn = false;
-    
-    try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('setInCallMode'); } catch (e) { debugPrint("InCall Mode Error: $e"); }
+    try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('setInCallMode'); } catch (e) {}
 
     telemetryLogs.clear();
     isCalling = true;
@@ -239,19 +238,7 @@ class CallController extends ChangeNotifier {
     sipStatus = "DIALING...";
     notifyListeners();
 
-    try {
-      await startSipCall(
-        targetIp: activeProfile!.ip,
-        targetPort: int.tryParse(activeProfile!.port) ?? 5060,
-        toUser: targetNumber,
-        fromUser: activeProfile!.user,
-      );
-    } catch (e) {
-      _processEvent("Error(\"Call Fail: $e\")");
-      isCalling = false;
-      if (Platform.isAndroid || Platform.isIOS) platform.invokeMethod('setNormalMode').catchError((_) {});
-      notifyListeners();
-    }
+    try { await startSipCall(targetIp: activeProfile!.ip, targetPort: int.tryParse(activeProfile!.port) ?? 5060, toUser: targetNumber, fromUser: activeProfile!.user); } catch (e) {}
   }
 
   Future<void> answerCall() async {
@@ -260,44 +247,15 @@ class CallController extends ChangeNotifier {
       if (!status.isGranted) status = await Permission.microphone.request();
       if (!status.isGranted) return rejectCall(); 
     }
-
     try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('setInCallMode'); } catch (e) {}
     sipStatus = "ANSWERING...";
     notifyListeners();
-    
-    try { await acceptInboundCall(); } catch (e) { _processEvent("Error(\"Answer Fail: $e\")"); }
+    try { await acceptInboundCall(); } catch (e) {}
   }
 
-  Future<void> rejectCall() async {
-    try {
-      await rejectInboundCall();
-      sipStatus = "REJECTED";
-      isCalling = false;
-      notifyListeners();
-    } catch (e) { _processEvent("Error(\"Reject Fail: $e\")"); }
-  }
-
-  Future<void> endCall() async {
-    if (!isCalling) return;
-    await endSipCall();
-    sipStatus = "TERMINATING...";
-    notifyListeners();
-  }
-
-  Future<void> toggleSpeaker() async {
-    isSpeakerOn = !isSpeakerOn;
-    notifyListeners();
-    try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn}); } catch (e) {}
-  }
-
-  void toggleMute() {
-    isMuted = !isMuted;
-    setMute(muted: isMuted); 
-    notifyListeners();
-  }
-
-  void sendDtmf(String key) {
-    sendSipDtmf(key: key);
-    _processEvent("Log(\"🎹 Sent DTMF: $key\")");
-  }
+  Future<void> rejectCall() async { try { await rejectInboundCall(); } catch (e) {} }
+  Future<void> endCall() async { try { await endSipCall(); } catch (e) {} }
+  Future<void> toggleSpeaker() async { isSpeakerOn = !isSpeakerOn; notifyListeners(); try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn}); } catch (e) {} }
+  void toggleMute() { isMuted = !isMuted; setMute(muted: isMuted); notifyListeners(); }
+  void sendDtmf(String key) { sendSipDtmf(key: key); _processEvent("Log(\"🎹 Sent DTMF: $key\")"); }
 }

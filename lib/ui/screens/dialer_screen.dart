@@ -48,14 +48,17 @@ class DialerScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, child) {
+        final isRegistered = controller.sipStatus == "REGISTERED";
+        final isTrunk = controller.activeProfile?.isTrunk ?? false;
+        
         return Scaffold(
           appBar: AppBar(
             title: Text(controller.activeProfile?.name ?? "No Profile", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,
-            leading: controller.isCalling ? null : IconButton(
-              icon: Icon(Icons.how_to_reg, color: controller.sipStatus == "REGISTERED" ? const Color(0xFF00FF9D) : Colors.white54),
+            leading: (controller.isCalling || isTrunk) ? null : IconButton(
+              icon: Icon(Icons.how_to_reg, color: isRegistered ? const Color(0xFF00FF9D) : Colors.white54),
               onPressed: controller.registerAccount,
             ),
             actions:[
@@ -76,53 +79,64 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
+  // [MİMARİ DÜZELTME]: Linux Masaüstü taşmasını önlemek için SingleChildScrollView eklendi.
   Widget _buildDialpad(BuildContext context) {
     final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children:[
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Text(
-            controller.dialedNumber.isEmpty ? "Enter Number" : controller.dialedNumber,
-            style: TextStyle(fontSize: 36, color: controller.dialedNumber.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
-          ),
-        ),
-        Text("Status: ${controller.sipStatus}", style: TextStyle(color: controller.sipStatus == "REGISTERED" ? Colors.green : Colors.white54, fontSize: 12)),
-        const SizedBox(height: 30),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5, crossAxisSpacing: 10, mainAxisSpacing: 10),
-            itemCount: keys.length,
-            itemBuilder: (context, index) {
-              return InkWell(
-                onTap: () => controller.appendDial(keys[index]),
-                borderRadius: BorderRadius.circular(40),
-                child: Container(alignment: Alignment.center, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1A1A1A)), child: Text(keys[index], style: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w300))),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 40),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children:[
-            const SizedBox(width: 50),
-            GestureDetector(
-              onTap: () => controller.makeCall(controller.dialedNumber),
-              child: Container(height: 75, width: 75, decoration: BoxDecoration(color: const Color(0xFF00FF9D).withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00FF9D), width: 2)), child: const Icon(Icons.call, color: Color(0xFF00FF9D), size: 36)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children:[
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    controller.dialedNumber.isEmpty ? "Enter Number" : controller.dialedNumber,
+                    style: TextStyle(fontSize: 36, color: controller.dialedNumber.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
+                  ),
+                ),
+                Text(controller.activeProfile!.isTrunk ? "MODE: RAW TRUNK (Direct IP)" : "Status: ${controller.sipStatus}", style: TextStyle(color: controller.sipStatus == "REGISTERED" || controller.activeProfile!.isTrunk ? Colors.green : Colors.white54, fontSize: 12)),
+                const SizedBox(height: 30),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5, crossAxisSpacing: 10, mainAxisSpacing: 10),
+                    itemCount: keys.length,
+                    itemBuilder: (context, index) {
+                      return InkWell(
+                        onTap: () => controller.appendDial(keys[index]),
+                        borderRadius: BorderRadius.circular(40),
+                        child: Container(alignment: Alignment.center, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1A1A1A)), child: Text(keys[index], style: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w300))),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children:[
+                    const SizedBox(width: 50),
+                    GestureDetector(
+                      onTap: () => controller.makeCall(controller.dialedNumber),
+                      child: Container(height: 75, width: 75, decoration: BoxDecoration(color: const Color(0xFF00FF9D).withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00FF9D), width: 2)), child: const Icon(Icons.call, color: Color(0xFF00FF9D), size: 36)),
+                    ),
+                    GestureDetector(
+                      onTap: controller.backspaceDial,
+                      onLongPress: () { while(controller.dialedNumber.isNotEmpty) { controller.backspaceDial(); } },
+                      child: const SizedBox(height: 50, width: 50, child: Icon(Icons.backspace, color: Colors.white54, size: 24)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20), // Ekranın altına boşluk
+              ],
             ),
-            GestureDetector(
-              onTap: controller.backspaceDial,
-              onLongPress: () { while(controller.dialedNumber.isNotEmpty) { controller.backspaceDial(); } },
-              child: const SizedBox(height: 50, width: 50, child: Icon(Icons.backspace, color: Colors.white54, size: 24)),
-            ),
-          ],
-        )
-      ],
+          ),
+        );
+      }
     );
   }
 
@@ -146,33 +160,39 @@ class DialerScreen extends StatelessWidget {
         );
     }
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children:[
-        Column(
-          children:[
-            Text(controller.currentCallTarget, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
-            const SizedBox(height: 12),
-            Text(controller.sipStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Color(0xFF00FF9D))),
-            const SizedBox(height: 16),
-            Text(controller.sipStatus == "CONNECTED" ? controller.formattedDuration : "Negotiating...", style: const TextStyle(fontSize: 18, color: Colors.white54, fontFamily: 'monospace')),
-          ],
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children:[
-            _actionBtn(Icons.mic_off, "MUTE", controller.isMuted, controller.toggleMute),
-            const SizedBox(width: 30),
-            _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
-            const SizedBox(width: 30),
-            _actionBtn(controller.isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", controller.isSpeakerOn, controller.toggleSpeaker),
-          ],
-        ),
-        GestureDetector(
-          onTap: controller.endCall, 
-          child: Container(height: 80, width: 80, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36)),
-        ),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children:[
+          const SizedBox(height: 40),
+          Column(
+            children:[
+              Text(controller.currentCallTarget, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
+              const SizedBox(height: 12),
+              Text(controller.sipStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Color(0xFF00FF9D))),
+              const SizedBox(height: 16),
+              Text(controller.sipStatus == "CONNECTED" ? controller.formattedDuration : "Negotiating...", style: const TextStyle(fontSize: 18, color: Colors.white54, fontFamily: 'monospace')),
+            ],
+          ),
+          const SizedBox(height: 40),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children:[
+              _actionBtn(Icons.mic_off, "MUTE", controller.isMuted, controller.toggleMute),
+              const SizedBox(width: 30),
+              _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
+              const SizedBox(width: 30),
+              _actionBtn(controller.isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", controller.isSpeakerOn, controller.toggleSpeaker),
+            ],
+          ),
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: controller.endCall, 
+            child: Container(height: 80, width: 80, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36)),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
     );
   }
 

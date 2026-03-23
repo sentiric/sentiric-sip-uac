@@ -22,7 +22,7 @@ class ProfilesScreen extends StatelessWidget {
               return ListTile(
                 leading: Icon(p.isTrunk ? Icons.dns : Icons.person, color: isActive ? const Color(0xFF00FF9D) : Colors.white54),
                 title: Text(p.name, style: TextStyle(color: isActive ? const Color(0xFF00FF9D) : Colors.white)),
-                subtitle: Text("${p.user}@${p.ip}:${p.port}"),
+                subtitle: Text(p.isTrunk ? "Trunk Target: ${p.ip}:${p.port}" : "Account: ${p.user}@${p.ip}:${p.port}"),
                 trailing: isActive ? const Icon(Icons.check_circle, color: Color(0xFF00FF9D)) : IconButton(
                   icon: const Icon(Icons.delete, color: Colors.white24),
                   onPressed: () { controller.profiles.removeAt(index); controller.saveState(); },
@@ -55,17 +55,20 @@ class ProfilesScreen extends StatelessWidget {
         title: const Text("New Profile", style: TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children:[
-            TextField(controller: nameC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Profile Name")),
+            TextField(controller: nameC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Profile Name (e.g. Prod 1)")),
             TextField(controller: ipC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "IP / Domain")),
             TextField(controller: portC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Port")),
-            TextField(controller: userC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Username")),
-            TextField(controller: passC, obscureText: true, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Password")),
             SwitchListTile(
               title: const Text("Raw Trunk Mode", style: TextStyle(color: Colors.white)),
+              subtitle: const Text("Direct IP Call without Register", style: TextStyle(color: Colors.white54, fontSize: 10)),
               value: isTrunk,
               activeColor: const Color(0xFF00FF9D),
               onChanged: (val) => setState(() => isTrunk = val)
-            )
+            ),
+            if (!isTrunk) ...[
+              TextField(controller: userC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "SIP Username")),
+              TextField(controller: passC, obscureText: true, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Password")),
+            ]
           ]),
         ),
         actions:[
@@ -92,12 +95,13 @@ class ContactsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        final myContacts = controller.activeContacts; // İZOLASYON
         return Scaffold(
-          appBar: AppBar(title: const Text("PHONEBOOK", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), backgroundColor: Colors.transparent),
-          body: ListView.builder(
-            itemCount: controller.contacts.length,
+          appBar: AppBar(title: Text("PHONEBOOK (${controller.activeProfile?.name})", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), backgroundColor: Colors.transparent),
+          body: myContacts.isEmpty ? const Center(child: Text("No contacts for this profile.", style: TextStyle(color: Colors.white24))) : ListView.builder(
+            itemCount: myContacts.length,
             itemBuilder: (context, index) {
-              final c = controller.contacts[index];
+              final c = myContacts[index];
               return ListTile(
                 leading: const CircleAvatar(backgroundColor: Color(0xFF1A1A1A), child: Icon(Icons.person, color: Colors.white)),
                 title: Text(c.name),
@@ -105,7 +109,7 @@ class ContactsScreen extends StatelessWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children:[
-                    IconButton(icon: const Icon(Icons.delete, color: Colors.white24), onPressed: () { controller.contacts.removeAt(index); controller.saveState(); }),
+                    IconButton(icon: const Icon(Icons.delete, color: Colors.white24), onPressed: () => controller.removeContact(c.id)),
                     IconButton(icon: const Icon(Icons.call, color: Color(0xFF00FF9D)), onPressed: () => controller.makeCall(c.number)),
                   ],
                 ),
@@ -123,14 +127,13 @@ class ContactsScreen extends StatelessWidget {
                 title: const Text("Add Contact", style: TextStyle(color: Colors.white)),
                 content: Column(mainAxisSize: MainAxisSize.min, children:[
                   TextField(controller: nC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Name")),
-                  TextField(controller: numC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "SIP Ext / Number")),
+                  TextField(controller: numC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Target Ext / Number")),
                 ]),
                 actions:[
                   TextButton(onPressed: () => Navigator.pop(c), child: const Text("CANCEL", style: TextStyle(color: Colors.white54))),
                   TextButton(onPressed: () {
                     if(nC.text.isNotEmpty && numC.text.isNotEmpty) {
-                      controller.contacts.add(PhoneContact(id: DateTime.now().millisecondsSinceEpoch.toString(), name: nC.text, number: numC.text));
-                      controller.saveState();
+                      controller.addContact(nC.text, numC.text);
                       Navigator.pop(c);
                     }
                   }, child: const Text("SAVE", style: TextStyle(color: Color(0xFF00FF9D))))
@@ -153,18 +156,19 @@ class HistoryScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        final myHistory = controller.activeHistory; // İZOLASYON
         return Scaffold(
           appBar: AppBar(
-            title: const Text("CALL HISTORY", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), 
+            title: Text("HISTORY (${controller.activeProfile?.name})", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), 
             backgroundColor: Colors.transparent,
             actions:[
-              IconButton(icon: const Icon(Icons.delete_sweep, color: Colors.white24), onPressed: () { controller.callHistory.clear(); controller.saveState(); })
+              IconButton(icon: const Icon(Icons.delete_sweep, color: Colors.white24), onPressed: controller.clearActiveHistory)
             ],
           ),
-          body: ListView.builder(
-            itemCount: controller.callHistory.length,
+          body: myHistory.isEmpty ? const Center(child: Text("No history for this profile.", style: TextStyle(color: Colors.white24))) : ListView.builder(
+            itemCount: myHistory.length,
             itemBuilder: (context, index) {
-              final h = controller.callHistory[index];
+              final h = myHistory[index];
               IconData icon = Icons.call_made;
               Color color = Colors.white54;
               if (h.direction == "IN") {
