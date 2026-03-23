@@ -1,7 +1,7 @@
-.PHONY: setup generate sync-sdk build-android run-android deploy-device clean-android clean-all
+.PHONY: setup generate sync-sdk build-android run-android deploy-device clean-android clean-linux clean-all build-linux run-linux
 
 # ==============================================================================
-# SENTIRIC SIP UAC - ORCHESTRATION MAKEFILE (v2.1 - Strict Sync)
+# SENTIRIC SIP UAC - ORCHESTRATION MAKEFILE (v3.0 - Multi-Platform)
 # ==============================================================================
 
 # 1. İlk kurulum (SDK'lar ve araçlar için)
@@ -12,25 +12,21 @@ setup:
 	cargo install cargo-ndk
 
 # 2. SDK Senkronizasyonu (KRİTİK ADIM)
-# Cargo.lock dosyasını ezerek SDK'yı en son commite günceller.
 sync-sdk:
 	@echo "--- 🔄 Telecom SDK Senkronize Ediliyor (Cargo Update)... ---"
 	cd rust && cargo update -p sentiric-telecom-client-sdk
 	@echo "✅ SDK Güncellendi."
 
-# 3. Köprü Kodlarını Üret
-# SDK güncellendikten SONRA çalışmalıdır ki yeni imzalar algılansın.
+# 3. Köprü Kodlarını Üret (Sadece Generate!)
 generate:
 	@echo "--- 🌉 Rust/Dart köprü kodları üretiliyor... ---"
 	flutter_rust_bridge_codegen generate
 	
-# 4. Android için Rust Kütüphanesini Derle (C++ bağımlılıkları dahil)
+# 4. Android için Derleme
 build-android:
 	@echo "--- 🦀 Rust çekirdeği Android için derleniyor... ---"
-	# ANDROID_HOME environment variable'ının sistemde tanımlı olduğunu varsayıyoruz.
 	cd rust && cargo ndk -t arm64-v8a -t armeabi-v7a -o ../android/app/src/main/jniLibs build --release
 	
-	# libc++_shared.so dosyasını bul ve manuel olarak kopyala (Kritik Adım)
 	@echo "🔍 C++ Shared Library aranıyor ve kopyalanıyor..."
 	@mkdir -p android/app/src/main/jniLibs/arm64-v8a
 	@find $$(echo $$ANDROID_HOME)/ndk -name "libc++_shared.so" | grep "aarch64" | head -n 1 | xargs -I {} cp {} android/app/src/main/jniLibs/arm64-v8a/
@@ -39,23 +35,49 @@ build-android:
 	@find $$(echo $$ANDROID_HOME)/ndk -name "libc++_shared.so" | grep "arm-linux-androideabi" | head -n 1 | xargs -I {} cp {} android/app/src/main/jniLibs/armeabi-v7a/
 	@echo "✅ ARMv7 libc++_shared.so kopyalandı."
 
-# 5. Temizlik Hedefleri (Ayrıştırıldı)
+# 5. Linux için Derleme
+build-linux:
+	@echo "--- 🐧 Linux Desktop için derleniyor... ---"
+	# Önce Rust kütüphanemizi Linux için derleyelim
+	cd rust && cargo build --release
+	# Sonra Flutter'ı derleyelim
+	flutter build linux --release
+	# Derlenen libuac.so dosyasını, uygulamanın çalışacağı lib/ klasörüne kopyalayalım
+	@mkdir -p build/linux/x64/release/bundle/lib/
+	@cp rust/target/release/libuac.so build/linux/x64/release/bundle/lib/
+
+# 6. Temizlik Hedefleri
 clean-android:
-	@echo "--- 🧹 Flutter & Android artıkları temizleniyor... ---"
-	flutter clean
+	@echo "--- 🧹 Android artıkları temizleniyor... ---"
 	rm -rf android/app/src/main/jniLibs/*
 
-clean-all: clean-android
-	@echo "--- 🧹 Rust derleme önbelleği temizleniyor... ---"
+clean-linux:
+	@echo "--- 🧹 Linux artıkları temizleniyor... ---"
+	rm -rf build/linux
+
+clean-all: clean-android clean-linux
+	@echo "--- 🧹 Tüm Flutter & Rust önbelleği temizleniyor... ---"
+	flutter clean
 	rm -rf rust/target
 
-# 6. Cihaza OTOMATİK YÜKLE VE ÇALIŞTIR (Debug Modu)
-# [AKIŞ]: Temizle -> SDK Güncelle -> Kod Üret -> Derle -> Çalıştır
+# 7. Cihazlara Yükleme ve Çalıştırma (Debug)
 run-android: clean-android sync-sdk generate build-android
-	@echo "--- 🚀 Uygulama cihaza yükleniyor (Debug)... ---"
-	flutter run --debug
+	@echo "--- 🚀 Android'de Çalıştırılıyor (Debug)... ---"
+	flutter run -d android
 
-# 7. Cihaza FİNAL SÜRÜMÜ YÜKLE (Performance Mode)
+run-linux: clean-linux sync-sdk generate
+	@echo "--- 🦀 Rust çekirdeği Linux (Debug) için derleniyor... ---"
+	cd rust && cargo build
+	@echo "--- 🚀 Linux Desktop'ta Çalıştırılıyor (Debug)... ---"
+	# Flutter run komutu çalışmadan hemen önce kütüphaneyi yerleştiriyoruz
+	# Flutter'ın aradığı varsayılan yer LD_LIBRARY_PATH veya mevcut çalışma dizinidir
+	# Biz çalıştırılabilir dosyanın yanına (veya sistemin bulabileceği bir yere) koyacağız
+	@mkdir -p build/linux/x64/debug/bundle/lib/
+	@cp rust/target/debug/libuac.so build/linux/x64/debug/bundle/lib/ 2>/dev/null || true
+	# LD_LIBRARY_PATH ile kütüphanenin yerini belirterek Flutter'ı başlatıyoruz
+	LD_LIBRARY_PATH=$$(pwd)/rust/target/debug:$$LD_LIBRARY_PATH flutter run -d linux
+
+# 8. Üretim (Release) Dağıtımı
 deploy-device: clean-android sync-sdk generate build-android
-	@echo "--- 🚀 Uygulama cihaza yükleniyor (Release)... ---"
-	flutter run --release
+	@echo "--- 🚀 Android'e Yükleniyor (Release)... ---"
+	flutter run --release -d android
