@@ -1,20 +1,22 @@
+# Dosya: sentiric-sip-uac/rust/Cargo.toml
 [package]
 name = "uac"
-version = "0.2.15"
+version = "0.2.16"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.42" }
+# YENİ TAG BURADA:
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.3.43" }
 
 flutter_rust_bridge = "=2.11.1"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0"
 tracing = "0.1"
 android_logger = "0.13"
+env_logger = "0.11" # YENİ EKLENDİ (Linux için)
 log = "0.4"
 lazy_static = "1.4"
 

@@ -1,9 +1,7 @@
 // Dosya: sentiric-sip-uac/rust/src/api/simple.rs
-
-use sentiric_telecom_client_sdk::{UacEvent, CallState, ClientCommand}; 
+use sentiric_telecom_client_sdk::{UacEvent, ClientCommand}; 
 use crate::frb_generated::StreamSink;
-use log::{info, LevelFilter};
-use android_logger::Config;
+use log::info;
 use tokio::sync::mpsc;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -16,36 +14,39 @@ lazy_static! {
 #[no_mangle]
 pub extern "system" fn JNI_OnLoad(vm: jni::JavaVM, _res: *mut std::ffi::c_void) -> jni::sys::jint {
     let vm = vm.get_java_vm_pointer() as *mut std::ffi::c_void;
-    unsafe {
-        ndk_context::initialize_android_context(vm, std::ptr::null_mut());
-    }
+    unsafe { ndk_context::initialize_android_context(vm, std::ptr::null_mut()); }
     jni::sys::JNI_VERSION_1_6
 }
 
+#[cfg(target_os = "android")]
 pub fn init_logger() {
     std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMU");
-
     android_logger::init_once(
-        Config::default()
-            .with_max_level(LevelFilter::Info)
+        android_logger::Config::default()
+            .with_max_level(log::LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    log::info!("✅ Logger Initialized via SDK v2.0 with STRICT PCMU codec.");
+    log::info!("✅ Android Logger Initialized via SDK");
 }
 
-/// 1. Motoru Arka Planda Başlatır ve Sürekli Dinler
+#[cfg(not(target_os = "android"))]
+pub fn init_logger() {
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMU");
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init();
+    log::info!("✅ Desktop/Linux Logger Initialized via SDK");
+}
+
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     let mut cmd_tx_guard = CMD_TX.lock().unwrap();
-    if cmd_tx_guard.is_some() {
-        return Ok(()); // Motor zaten çalışıyor
-    }
+    if cmd_tx_guard.is_some() { return Ok(()); }
 
     let (event_tx, mut event_rx) = mpsc::channel::<UacEvent>(100);
     let (cmd_tx, cmd_rx) = mpsc::channel::<ClientCommand>(32);
     
     *cmd_tx_guard = Some(cmd_tx);
 
-    // Motoru başlat ve bırak
     tokio::spawn(async move {
         let mut engine = sentiric_telecom_client_sdk::engine::SipEngine::new(event_tx, cmd_rx, false).await;
         engine.run().await;
@@ -63,18 +64,14 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 2. SIP Hesabı ile Kayıt İşlemi
 pub async fn register_sip_account(target_ip: String, target_port: u16, user: String, password: String) -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
         let _ = tx.send(ClientCommand::Register { target_ip, target_port, user, password }).await;
-    } else {
-        log::warn!("⚠️ Engine not started!");
     }
     Ok(())
 }
 
-/// 3. Aramayı Başlatma (Giden Arama)
 pub async fn start_sip_call(target_ip: String, target_port: u16, to_user: String, from_user: String) -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
@@ -83,57 +80,37 @@ pub async fn start_sip_call(target_ip: String, target_port: u16, to_user: String
     Ok(())
 }
 
-/// [YENİ]: 4. Gelen Aramayı Kabul Et (Answer)
 pub async fn accept_inbound_call() -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(ClientCommand::AcceptCall).await;
-        log::info!("📱 UI accepted incoming call.");
-    }
+    if let Some(tx) = tx_opt { let _ = tx.send(ClientCommand::AcceptCall).await; }
     Ok(())
 }
 
-/// [YENİ]: 5. Gelen Aramayı Reddet (Decline)
 pub async fn reject_inbound_call() -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(ClientCommand::RejectCall).await;
-        log::info!("🚫 UI rejected incoming call.");
-    }
+    if let Some(tx) = tx_opt { let _ = tx.send(ClientCommand::RejectCall).await; }
     Ok(())
 }
 
-/// Çağrıyı kesmek için Flutter tarafından çağrılır.
 pub async fn end_sip_call() -> anyhow::Result<()> {
     let tx_opt = CMD_TX.lock().unwrap().clone();
-    if let Some(tx) = tx_opt {
-        info!("🛑 Flutter UI requested call termination. Sending BYE...");
-        let _ = tx.send(ClientCommand::EndCall).await;
-    }
+    if let Some(tx) = tx_opt { let _ = tx.send(ClientCommand::EndCall).await; }
     Ok(())
 }
 
 pub async fn update_audio_settings(mic_gain: f32, speaker_gain: f32, enable_aec: bool) {
     let tx_opt = CMD_TX.lock().unwrap().clone();
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(ClientCommand::UpdateSettings { mic_gain, speaker_gain, enable_aec }).await;
-    }
+    if let Some(tx) = tx_opt { let _ = tx.send(ClientCommand::UpdateSettings { mic_gain, speaker_gain, enable_aec }).await; }
 }
 
 pub async fn send_sip_dtmf(key: String) {
     let tx_opt = CMD_TX.lock().unwrap().clone();
     if let Some(tx) = tx_opt {
-        if let Some(c) = key.chars().next() {
-            let _ = tx.send(ClientCommand::SendDtmf { key: c }).await;
-            log::info!("🎹 UI Requested DTMF: {}", c);
-        }
+        if let Some(c) = key.chars().next() { let _ = tx.send(ClientCommand::SendDtmf { key: c }).await; }
     }
 }
 
 pub async fn set_mute(muted: bool) {
     let tx_opt = CMD_TX.lock().unwrap().clone();
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(ClientCommand::SetMute { muted }).await;
-        log::info!("🎤 UI Requested MUTE state: {}", muted);
-    }
+    if let Some(tx) = tx_opt { let _ = tx.send(ClientCommand::SetMute { muted }).await; }
 }

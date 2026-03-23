@@ -25,29 +25,13 @@ class DialerScreen extends StatelessWidget {
               Expanded(
                 child: GridView.builder(
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5, crossAxisSpacing: 10, mainAxisSpacing: 10),
                   itemCount: keys.length,
                   itemBuilder: (context, index) {
                     return InkWell(
-                      onTap: () {
-                        controller.sendDtmf(keys[index]);
-                        Navigator.pop(context); // Basınca kapat (opsiyonel)
-                      },
+                      onTap: () { controller.sendDtmf(keys[index]); Navigator.pop(context); },
                       borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(keys[index], style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w300)),
-                      ),
+                      child: Container(decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)), alignment: Alignment.center, child: Text(keys[index], style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w300))),
                     );
                   },
                 ),
@@ -66,21 +50,22 @@ class DialerScreen extends StatelessWidget {
       builder: (context, child) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('SIP UAC', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 3.0)),
+            title: Text(controller.activeProfile?.name ?? "No Profile", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,
+            leading: controller.isCalling ? null : IconButton(
+              icon: Icon(Icons.how_to_reg, color: controller.sipStatus == "REGISTERED" ? const Color(0xFF00FF9D) : Colors.white54),
+              onPressed: controller.registerAccount,
+            ),
             actions:[
-              IconButton(
-                onPressed: controller.toggleDebugConsole,
-                icon: Icon(Icons.terminal, color: controller.showDebugConsole ? const Color(0xFF00FF9D) : Colors.white30)
-              )
+              IconButton(onPressed: controller.toggleDebugConsole, icon: Icon(Icons.terminal, color: controller.showDebugConsole ? const Color(0xFF00FF9D) : Colors.white30))
             ],
           ),
           body: SafeArea(
             child: Column(
               children:[
-                if (!controller.isCalling) _buildDialerForm(),
+                if (!controller.isCalling) Expanded(child: _buildDialpad(context)),
                 if (controller.isCalling) Expanded(child: _buildActiveCallScreen(context)),
                 if (controller.showDebugConsole) Expanded(child: _buildConsole()),
               ],
@@ -91,222 +76,102 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDialerForm() {
-    return Expanded(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: ToggleButtons(
-                isSelected:[!controller.isTrunkMode, controller.isTrunkMode],
-                onPressed: (int index) => controller.setMode(index == 1),
-                borderRadius: BorderRadius.circular(8),
-                selectedColor: Colors.black,
-                fillColor: const Color(0xFF00FF9D),
-                color: Colors.white54,
-                constraints: const BoxConstraints(minHeight: 36, minWidth: 140),
-                children: const[
-                  Text("SIP ACCOUNT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  Text("RAW TRUNK", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            const Text("TARGET NODE", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
-            const SizedBox(height: 12),
-            Row(children:[
-              Expanded(flex: 3, child: _input(controller.ipController, controller.isTrunkMode ? "IP Address" : "Domain / SBC IP", Icons.dns, keyboardType: TextInputType.url)),
-              const SizedBox(width: 8),
-              Expanded(flex: 2, child: _input(controller.portController, "Port", Icons.numbers, isCompact: true, keyboardType: TextInputType.number)),
-            ]),
-            const SizedBox(height: 20),
-            
-            const Text("IDENTITY", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
-            const SizedBox(height: 12),
-            _input(controller.fromController, "Username / Caller ID", Icons.person_outline, keyboardType: TextInputType.text),
-            
-            if (!controller.isTrunkMode) ...[
-              const SizedBox(height: 12),
-              _input(controller.passwordController, "Password", Icons.lock_outline, obscureText: true),
-            ],
-
-            const SizedBox(height: 20),
-
-            if (controller.isTrunkMode) ...[
-              const Text("DESTINATION", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
-              const SizedBox(height: 12),
-              _input(controller.toController, "Target Extension (e.g., 9999)", Icons.call_made, keyboardType: TextInputType.phone),
-              const SizedBox(height: 30),
-              _buildBigButton("INJECT CALL", Icons.rocket_launch, controller.makeCall, const Color(0xFF00FF9D)),
-            ] else ...[
-              if (controller.sipStatus != "REGISTERED") ...[
-                const SizedBox(height: 20),
-                _buildBigButton("REGISTER", Icons.how_to_reg, controller.registerAccount, Colors.blueAccent),
-                const SizedBox(height: 12),
-                Center(child: Text("Status: ${controller.sipStatus}", style: const TextStyle(color: Colors.white54, fontSize: 12))),
-              ] else ...[
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children:[Icon(Icons.check_circle, color: Colors.green, size: 18), SizedBox(width: 8), Text("REGISTERED SECURELY", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text("DESTINATION", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
-                const SizedBox(height: 12),
-                _input(controller.toController, "Target Extension (e.g., 2002)", Icons.call_made, keyboardType: TextInputType.phone),
-                const SizedBox(height: 30),
-                _buildBigButton("CALL", Icons.call, controller.makeCall, const Color(0xFF00FF9D)),
-              ]
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBigButton(String text, IconData icon, VoidCallback onTap, Color color) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 65,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color, width: 1.5),
-          boxShadow:[BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 1)],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children:[
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 16),
-            Text(text, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveCallScreen(BuildContext context) {
-    // [YENİ]: Gelen Arama Ekranı (Inbound Call UI)
-    if (controller.sipStatus == "INCOMING CALL") {
-        return _buildIncomingCallUI();
-    }
-
-    Color statusColor = controller.sipStatus == "CONNECTED" ? const Color(0xFF00FF9D) : Colors.orangeAccent;
-    
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Column(
-          children:[
-            Text(controller.toController.text, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: statusColor.withOpacity(0.5)),
-              ),
-              child: Text(controller.sipStatus, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: statusColor)),
-            ),
-            const SizedBox(height: 16),
-            Text(controller.sipStatus == "CONNECTED" ? controller.formattedDuration : "Negotiating...", style: const TextStyle(fontSize: 18, color: Colors.white54, fontFamily: 'monospace')),
-          ],
-        ),
-
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 30),
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children:[
-              _statItem("TX (EGRESS)", "${controller.txPackets}", Colors.white70),
-              Icon(Icons.compare_arrows, color: controller.isMediaFlowing ? const Color(0xFF00FF9D) : Colors.white24, size: 28),
-              _statItem("RX (INGRESS)", "${controller.rxPackets}", Colors.white70),
-            ],
-          ),
-        ),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children:[
-            _actionBtn(Icons.mic_off, controller.isMuted ? "MUTED" : "MUTE", controller.isMuted, controller.toggleMute),
-            const SizedBox(width: 20),
-            _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
-            const SizedBox(width: 20),
-            _actionBtn(controller.isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "ROUTE", controller.isSpeakerOn, controller.toggleSpeaker),
-          ],
-        ),
-
-        GestureDetector(
-          onTap: controller.endCall, 
-          child: Container(
-            height: 80, width: 80,
-            decoration: const BoxDecoration(
-              color: Colors.redAccent, 
-              shape: BoxShape.circle, 
-              boxShadow:[BoxShadow(color: Color(0x66FF5252), blurRadius: 20, spreadRadius: 2)]
-            ),
-            child: const Icon(Icons.call_end, color: Colors.white, size: 36),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // [YENİ]: Gelen Arama Ekranı Parçası
-  Widget _buildIncomingCallUI() {
+  Widget _buildDialpad(BuildContext context) {
+    final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children:[
-        const Icon(Icons.ring_volume, size: 80, color: Color(0xFF00FF9D)),
-        const SizedBox(height: 40),
-        Text(
-          controller.incomingCaller, 
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w200, color: Colors.white),
-          textAlign: TextAlign.center,
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Text(
+            controller.dialedNumber.isEmpty ? "Enter Number" : controller.dialedNumber,
+            style: TextStyle(fontSize: 36, color: controller.dialedNumber.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
+          ),
         ),
-        const SizedBox(height: 10),
-        const Text("INCOMING CALL", style: TextStyle(color: Color(0xFF00FF9D), letterSpacing: 4, fontWeight: FontWeight.bold, fontSize: 12)),
-        const SizedBox(height: 80),
+        Text("Status: ${controller.sipStatus}", style: TextStyle(color: controller.sipStatus == "REGISTERED" ? Colors.green : Colors.white54, fontSize: 12)),
+        const SizedBox(height: 30),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 1.5, crossAxisSpacing: 10, mainAxisSpacing: 10),
+            itemCount: keys.length,
+            itemBuilder: (context, index) {
+              return InkWell(
+                onTap: () => controller.appendDial(keys[index]),
+                borderRadius: BorderRadius.circular(40),
+                child: Container(alignment: Alignment.center, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1A1A1A)), child: Text(keys[index], style: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w300))),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 40),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children:[
-            _circleActionBtn(Icons.call_end, "REJECT", Colors.redAccent, controller.rejectCall),
-            _circleActionBtn(Icons.call, "ANSWER", const Color(0xFF00FF9D), controller.answerCall),
+            const SizedBox(width: 50),
+            GestureDetector(
+              onTap: () => controller.makeCall(controller.dialedNumber),
+              child: Container(height: 75, width: 75, decoration: BoxDecoration(color: const Color(0xFF00FF9D).withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00FF9D), width: 2)), child: const Icon(Icons.call, color: Color(0xFF00FF9D), size: 36)),
+            ),
+            GestureDetector(
+              onTap: controller.backspaceDial,
+              onLongPress: () { while(controller.dialedNumber.isNotEmpty) { controller.backspaceDial(); } },
+              child: const SizedBox(height: 50, width: 50, child: Icon(Icons.backspace, color: Colors.white54, size: 24)),
+            ),
           ],
         )
       ],
     );
   }
 
-  Widget _circleActionBtn(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildActiveCallScreen(BuildContext context) {
+    if (controller.sipStatus == "INCOMING CALL") {
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children:[
+            const Icon(Icons.ring_volume, size: 80, color: Color(0xFF00FF9D)),
+            const SizedBox(height: 40),
+            Text(controller.incomingCaller, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w200, color: Colors.white)),
+            const SizedBox(height: 80),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children:[
+                GestureDetector(onTap: controller.rejectCall, child: Container(height: 75, width: 75, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36))),
+                GestureDetector(onTap: controller.answerCall, child: Container(height: 75, width: 75, decoration: const BoxDecoration(color: Color(0xFF00FF9D), shape: BoxShape.circle), child: const Icon(Icons.call, color: Colors.black, size: 36))),
+              ],
+            )
+          ],
+        );
+    }
+
     return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children:[
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 70, width: 70,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: color, width: 2),
-            ),
-            child: Icon(icon, color: color, size: 30),
-          ),
+        Column(
+          children:[
+            Text(controller.currentCallTarget, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)),
+            const SizedBox(height: 12),
+            Text(controller.sipStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Color(0xFF00FF9D))),
+            const SizedBox(height: 16),
+            Text(controller.sipStatus == "CONNECTED" ? controller.formattedDuration : "Negotiating...", style: const TextStyle(fontSize: 18, color: Colors.white54, fontFamily: 'monospace')),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children:[
+            _actionBtn(Icons.mic_off, "MUTE", controller.isMuted, controller.toggleMute),
+            const SizedBox(width: 30),
+            _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
+            const SizedBox(width: 30),
+            _actionBtn(controller.isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", controller.isSpeakerOn, controller.toggleSpeaker),
+          ],
+        ),
+        GestureDetector(
+          onTap: controller.endCall, 
+          child: Container(height: 80, width: 80, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36)),
+        ),
       ],
     );
   }
@@ -316,14 +181,7 @@ class DialerScreen extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children:[
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: isActive ? Colors.white : const Color(0xFF1A1A1A),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 26),
-          ),
+          Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: isActive ? Colors.white : const Color(0xFF1A1A1A), shape: BoxShape.circle), child: Icon(icon, color: isActive ? Colors.black : Colors.white, size: 26)),
           const SizedBox(height: 10),
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
         ],
@@ -331,77 +189,17 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
-  Widget _input(TextEditingController ctrl, String label, IconData icon, {bool isCompact = false, TextInputType keyboardType = TextInputType.text, bool obscureText = false}) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      style: TextStyle(fontSize: isCompact ? 13 : 15, fontFamily: 'monospace', color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: isCompact ? 11 : 13, color: Colors.white30, letterSpacing: 1.0),
-        prefixIcon: Icon(icon, size: isCompact ? 16 : 20, color: Colors.white30),
-        filled: true,
-        fillColor: const Color(0xFF111111),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF00FF9D), width: 1.5)),
-        contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: isCompact ? 6 : 16),
-      ),
-    );
-  }
-
-  Widget _statItem(String label, String val, Color color) {
-    return Column(
-      children:[
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.white30, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-        const SizedBox(height: 8),
-        Text(val, style: TextStyle(fontSize: 20, color: color, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   Widget _buildConsole() {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF090909),
-        border: Border(top: BorderSide(color: Colors.white10)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children:[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: const Color(0xFF111111),
-            child: const Row(
-              children:[
-                Icon(Icons.terminal, color: Colors.white30, size: 14),
-                SizedBox(width: 8),
-                Text("LIVE TELEMETRY STREAM", style: TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              controller: controller.scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: controller.telemetryLogs.length,
-              itemBuilder: (context, index) {
-                final log = controller.telemetryLogs[index];
-                Color color = Colors.white54;
-                if (log.level == TelemetryLevel.status) color = const Color(0xFF00FF9D);
-                if (log.level == TelemetryLevel.error) color = Colors.redAccent;
-                if (log.level == TelemetryLevel.sipTx) color = Colors.blueAccent;  
-                if (log.level == TelemetryLevel.sipRx) color = Colors.amberAccent; 
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text("> ${log.message}", style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11)),
-                );
-              },
-            ),
-          ),
-        ],
+      color: const Color(0xFF090909),
+      child: ListView.builder(
+        controller: controller.scrollController,
+        padding: const EdgeInsets.all(12),
+        itemCount: controller.telemetryLogs.length,
+        itemBuilder: (context, index) {
+          final log = controller.telemetryLogs[index];
+          return Text("> ${log.message}", style: TextStyle(color: log.level == TelemetryLevel.error ? Colors.red : Colors.white54, fontFamily: 'monospace', fontSize: 11));
+        },
       ),
     );
   }

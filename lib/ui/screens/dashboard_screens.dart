@@ -1,0 +1,189 @@
+// Dosya: sentiric-sip-uac/lib/ui/screens/dashboard_screens.dart
+import 'package:flutter/material.dart';
+import '../../controllers/call_controller.dart';
+import '../../models.dart';
+
+class ProfilesScreen extends StatelessWidget {
+  final CallController controller;
+  const ProfilesScreen({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(title: const Text("SIP PROFILES", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), backgroundColor: Colors.transparent),
+          body: ListView.builder(
+            itemCount: controller.profiles.length,
+            itemBuilder: (context, index) {
+              final p = controller.profiles[index];
+              final isActive = controller.activeProfile?.id == p.id;
+              return ListTile(
+                leading: Icon(p.isTrunk ? Icons.dns : Icons.person, color: isActive ? const Color(0xFF00FF9D) : Colors.white54),
+                title: Text(p.name, style: TextStyle(color: isActive ? const Color(0xFF00FF9D) : Colors.white)),
+                subtitle: Text("${p.user}@${p.ip}:${p.port}"),
+                trailing: isActive ? const Icon(Icons.check_circle, color: Color(0xFF00FF9D)) : IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.white24),
+                  onPressed: () { controller.profiles.removeAt(index); controller.saveState(); },
+                ),
+                onTap: () => controller.loadProfile(p),
+              );
+            },
+          ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: const Color(0xFF00FF9D),
+            child: const Icon(Icons.add, color: Colors.black),
+            onPressed: () => _showAddProfile(context),
+          ),
+        );
+      }
+    );
+  }
+
+  void _showAddProfile(BuildContext context) {
+    final nameC = TextEditingController();
+    final ipC = TextEditingController();
+    final portC = TextEditingController(text: "5060");
+    final userC = TextEditingController();
+    final passC = TextEditingController();
+    bool isTrunk = false;
+
+    showDialog(context: context, builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        backgroundColor: const Color(0xFF111111),
+        title: const Text("New Profile", style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children:[
+            TextField(controller: nameC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Profile Name")),
+            TextField(controller: ipC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "IP / Domain")),
+            TextField(controller: portC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Port")),
+            TextField(controller: userC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Username")),
+            TextField(controller: passC, obscureText: true, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Password")),
+            SwitchListTile(
+              title: const Text("Raw Trunk Mode", style: TextStyle(color: Colors.white)),
+              value: isTrunk,
+              activeColor: const Color(0xFF00FF9D),
+              onChanged: (val) => setState(() => isTrunk = val)
+            )
+          ]),
+        ),
+        actions:[
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL", style: TextStyle(color: Colors.white54))),
+          TextButton(onPressed: () {
+            if (nameC.text.isNotEmpty && ipC.text.isNotEmpty) {
+              controller.profiles.add(SipProfile(id: DateTime.now().millisecondsSinceEpoch.toString(), name: nameC.text, ip: ipC.text, port: portC.text, user: userC.text, password: passC.text, isTrunk: isTrunk));
+              controller.saveState();
+              Navigator.pop(context);
+            }
+          }, child: const Text("SAVE", style: TextStyle(color: Color(0xFF00FF9D))))
+        ],
+      )
+    ));
+  }
+}
+
+class ContactsScreen extends StatelessWidget {
+  final CallController controller;
+  const ContactsScreen({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(title: const Text("PHONEBOOK", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), backgroundColor: Colors.transparent),
+          body: ListView.builder(
+            itemCount: controller.contacts.length,
+            itemBuilder: (context, index) {
+              final c = controller.contacts[index];
+              return ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF1A1A1A), child: Icon(Icons.person, color: Colors.white)),
+                title: Text(c.name),
+                subtitle: Text(c.number),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children:[
+                    IconButton(icon: const Icon(Icons.delete, color: Colors.white24), onPressed: () { controller.contacts.removeAt(index); controller.saveState(); }),
+                    IconButton(icon: const Icon(Icons.call, color: Color(0xFF00FF9D)), onPressed: () => controller.makeCall(c.number)),
+                  ],
+                ),
+              );
+            },
+          ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: const Color(0xFF00FF9D),
+            child: const Icon(Icons.person_add, color: Colors.black),
+            onPressed: () {
+              final nC = TextEditingController();
+              final numC = TextEditingController();
+              showDialog(context: context, builder: (c) => AlertDialog(
+                backgroundColor: const Color(0xFF111111),
+                title: const Text("Add Contact", style: TextStyle(color: Colors.white)),
+                content: Column(mainAxisSize: MainAxisSize.min, children:[
+                  TextField(controller: nC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Name")),
+                  TextField(controller: numC, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "SIP Ext / Number")),
+                ]),
+                actions:[
+                  TextButton(onPressed: () => Navigator.pop(c), child: const Text("CANCEL", style: TextStyle(color: Colors.white54))),
+                  TextButton(onPressed: () {
+                    if(nC.text.isNotEmpty && numC.text.isNotEmpty) {
+                      controller.contacts.add(PhoneContact(id: DateTime.now().millisecondsSinceEpoch.toString(), name: nC.text, number: numC.text));
+                      controller.saveState();
+                      Navigator.pop(c);
+                    }
+                  }, child: const Text("SAVE", style: TextStyle(color: Color(0xFF00FF9D))))
+                ],
+              ));
+            },
+          ),
+        );
+      }
+    );
+  }
+}
+
+class HistoryScreen extends StatelessWidget {
+  final CallController controller;
+  const HistoryScreen({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("CALL HISTORY", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), 
+            backgroundColor: Colors.transparent,
+            actions:[
+              IconButton(icon: const Icon(Icons.delete_sweep, color: Colors.white24), onPressed: () { controller.callHistory.clear(); controller.saveState(); })
+            ],
+          ),
+          body: ListView.builder(
+            itemCount: controller.callHistory.length,
+            itemBuilder: (context, index) {
+              final h = controller.callHistory[index];
+              IconData icon = Icons.call_made;
+              Color color = Colors.white54;
+              if (h.direction == "IN") {
+                icon = h.status == "MISSED" ? Icons.call_missed : Icons.call_received;
+                color = h.status == "MISSED" ? Colors.redAccent : Colors.blueAccent;
+              } else {
+                color = h.status == "ANSWERED" ? const Color(0xFF00FF9D) : Colors.white54;
+              }
+              return ListTile(
+                leading: Icon(icon, color: color),
+                title: Text(h.targetNumber),
+                subtitle: Text("${h.timestamp.toLocal().toString().split('.')[0]} • ${h.status}"),
+                trailing: Text("${h.durationSeconds}s", style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Colors.white70)),
+                onTap: () => controller.makeCall(h.targetNumber),
+              );
+            },
+          ),
+        );
+      }
+    );
+  }
+}

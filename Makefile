@@ -63,7 +63,7 @@ clean-all: clean-android clean-linux
 # 7. Cihazlara Yükleme ve Çalıştırma (Debug)
 run-android: clean-android sync-sdk generate build-android
 	@echo "--- 🚀 Android'de Çalıştırılıyor (Debug)... ---"
-	flutter run -d android
+	flutter run
 
 run-linux: clean-linux sync-sdk generate
 	@echo "--- 🦀 Rust çekirdeği Linux (Debug) için derleniyor... ---"
@@ -80,4 +80,4 @@ run-linux: clean-linux sync-sdk generate
 # 8. Üretim (Release) Dağıtımı
 deploy-device: clean-android sync-sdk generate build-android
 	@echo "--- 🚀 Android'e Yükleniyor (Release)... ---"
-	flutter run --release -d android
+	flutter run --release

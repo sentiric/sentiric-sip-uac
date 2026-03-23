@@ -11,11 +11,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 Future<void> initLogger() => RustLib.instance.api.crateApiSimpleInitLogger();
 
-/// 1. Motoru Arka Planda Başlatır ve Sürekli Dinler
 Stream<String> startEngine() =>
     RustLib.instance.api.crateApiSimpleStartEngine();
 
-/// 2. SIP Hesabı ile Kayıt İşlemi
 Future<void> registerSipAccount({
   required String targetIp,
   required int targetPort,
@@ -28,7 +26,6 @@ Future<void> registerSipAccount({
   password: password,
 );
 
-/// 3. Aramayı Başlatma (Giden Arama)
 Future<void> startSipCall({
   required String targetIp,
   required int targetPort,
@@ -41,15 +38,12 @@ Future<void> startSipCall({
   fromUser: fromUser,
 );
 
-/// [YENİ]: 4. Gelen Aramayı Kabul Et (Answer)
 Future<void> acceptInboundCall() =>
     RustLib.instance.api.crateApiSimpleAcceptInboundCall();
 
-/// [YENİ]: 5. Gelen Aramayı Reddet (Decline)
 Future<void> rejectInboundCall() =>
     RustLib.instance.api.crateApiSimpleRejectInboundCall();
 
-/// Çağrıyı kesmek için Flutter tarafından çağrılır.
 Future<void> endSipCall() => RustLib.instance.api.crateApiSimpleEndSipCall();
 
 Future<void> updateAudioSettings({

@@ -1,8 +1,9 @@
+# Dosya: sentiric-sip-uac/pubspec.yaml
 name: sentiric_sip_uac
 description: "Sentiric Mobile SIP UAC for field testing and validation."
 publish_to: 'none'
 
-version: 1.5.0+10
+version: 1.6.0+11
 
 environment:
   sdk: ^3.10.4
@@ -16,18 +17,14 @@ dependencies:
   permission_handler: ^11.3.1  
   rename_app: ^1.6.5
   flutter_launcher_icons: ^0.14.4
-  # [YENİ]: Verileri (Caller ID, IP vb.) kaydetmek için
   shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:
-
-
   uses-material-design: true
 
 flutter_launcher_icons:
