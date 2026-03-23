@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -339331013;
+  int get rustContentHash => 2054059092;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -79,11 +79,20 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiSimpleInitLogger();
 
+  Future<void> crateApiSimpleRegisterSipAccount({
+    required String targetIp,
+    required int targetPort,
+    required String user,
+    required String password,
+  });
+
   Future<void> crateApiSimpleSendSipDtmf({required String key});
 
   Future<void> crateApiSimpleSetMute({required bool muted});
 
-  Stream<String> crateApiSimpleStartSipCall({
+  Stream<String> crateApiSimpleStartEngine();
+
+  Future<void> crateApiSimpleStartSipCall({
     required String targetIp,
     required int targetPort,
     required String toUser,
@@ -160,6 +169,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_logger", argNames: []);
 
   @override
+  Future<void> crateApiSimpleRegisterSipAccount({
+    required String targetIp,
+    required int targetPort,
+    required String user,
+    required String password,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(targetIp, serializer);
+          sse_encode_u_16(targetPort, serializer);
+          sse_encode_String(user, serializer);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSimpleRegisterSipAccountConstMeta,
+        argValues: [targetIp, targetPort, user, password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSimpleRegisterSipAccountConstMeta =>
+      const TaskConstMeta(
+        debugName: "register_sip_account",
+        argNames: ["targetIp", "targetPort", "user", "password"],
+      );
+
+  @override
   Future<void> crateApiSimpleSendSipDtmf({required String key}) {
     return handler.executeNormal(
       NormalTask(
@@ -169,7 +217,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 4,
             port: port_,
           );
         },
@@ -197,7 +245,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -216,27 +264,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "set_mute", argNames: ["muted"]);
 
   @override
-  Stream<String> crateApiSimpleStartSipCall({
-    required String targetIp,
-    required int targetPort,
-    required String toUser,
-    required String fromUser,
-  }) {
+  Stream<String> crateApiSimpleStartEngine() {
     final sink = RustStreamSink<String>();
     unawaited(
       handler.executeNormal(
         NormalTask(
           callFfi: (port_) {
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            sse_encode_String(targetIp, serializer);
-            sse_encode_u_16(targetPort, serializer);
-            sse_encode_String(toUser, serializer);
-            sse_encode_String(fromUser, serializer);
             sse_encode_StreamSink_String_Sse(sink, serializer);
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 5,
+              funcId: 6,
               port: port_,
             );
           },
@@ -244,8 +283,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeSuccessData: sse_decode_unit,
             decodeErrorData: sse_decode_AnyhowException,
           ),
-          constMeta: kCrateApiSimpleStartSipCallConstMeta,
-          argValues: [targetIp, targetPort, toUser, fromUser, sink],
+          constMeta: kCrateApiSimpleStartEngineConstMeta,
+          argValues: [sink],
           apiImpl: this,
         ),
       ),
@@ -253,9 +292,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return sink.stream;
   }
 
+  TaskConstMeta get kCrateApiSimpleStartEngineConstMeta =>
+      const TaskConstMeta(debugName: "start_engine", argNames: ["sink"]);
+
+  @override
+  Future<void> crateApiSimpleStartSipCall({
+    required String targetIp,
+    required int targetPort,
+    required String toUser,
+    required String fromUser,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(targetIp, serializer);
+          sse_encode_u_16(targetPort, serializer);
+          sse_encode_String(toUser, serializer);
+          sse_encode_String(fromUser, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSimpleStartSipCallConstMeta,
+        argValues: [targetIp, targetPort, toUser, fromUser],
+        apiImpl: this,
+      ),
+    );
+  }
+
   TaskConstMeta get kCrateApiSimpleStartSipCallConstMeta => const TaskConstMeta(
     debugName: "start_sip_call",
-    argNames: ["targetIp", "targetPort", "toUser", "fromUser", "sink"],
+    argNames: ["targetIp", "targetPort", "toUser", "fromUser"],
   );
 
   @override
@@ -274,7 +349,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },

@@ -35,6 +35,7 @@ class DialerScreen extends StatelessWidget {
                     return InkWell(
                       onTap: () {
                         controller.sendDtmf(keys[index]);
+                        Navigator.pop(context); // Basınca kapat (opsiyonel)
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -59,7 +60,6 @@ class DialerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ListenableBuilder sayesinde setState kullanmadan UI otomatik güncellenir.
     return ListenableBuilder(
       listenable: controller,
       builder: (context, child) {
@@ -97,43 +97,99 @@ class DialerScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // YENİ: MOD SEÇİCİ
+            Center(
+              child: ToggleButtons(
+                isSelected: [!controller.isTrunkMode, controller.isTrunkMode],
+                onPressed: (int index) => controller.setMode(index == 1),
+                borderRadius: BorderRadius.circular(8),
+                selectedColor: Colors.black,
+                fillColor: const Color(0xFF00FF9D),
+                color: Colors.white54,
+                constraints: const BoxConstraints(minHeight: 36, minWidth: 140),
+                children: const [
+                  Text("SIP ACCOUNT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text("RAW TRUNK", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             const Text("TARGET NODE", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(flex: 3, child: _input(controller.ipController, "IP Address", Icons.dns, keyboardType: TextInputType.url)),
+              Expanded(flex: 3, child: _input(controller.ipController, controller.isTrunkMode ? "IP Address" : "Domain / SBC IP", Icons.dns, keyboardType: TextInputType.url)),
               const SizedBox(width: 8),
               Expanded(flex: 2, child: _input(controller.portController, "Port", Icons.numbers, isCompact: true, keyboardType: TextInputType.number)),
             ]),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             
-            const Text("SIP PROTOCOL", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+            const Text("IDENTITY", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
             const SizedBox(height: 12),
-            _input(controller.toController, "Destination Ext (e.g., 9999)", Icons.call_made, keyboardType: TextInputType.phone),
-            const SizedBox(height: 12),
-            _input(controller.fromController, "Caller Identity", Icons.person_outline, keyboardType: TextInputType.text),
+            _input(controller.fromController, "Username / Caller ID", Icons.person_outline, keyboardType: TextInputType.text),
             
-            const SizedBox(height: 48),
-            
-            GestureDetector(
-              onTap: controller.toggleCall,
-              child: Container(
-                height: 70,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF9D).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00FF9D), width: 1.5),
-                  boxShadow: const [BoxShadow(color: Color(0x2200FF9D), blurRadius: 30, spreadRadius: 2)],
+            if (!controller.isTrunkMode) ...[
+              const SizedBox(height: 12),
+              _input(controller.passwordController, "Password", Icons.lock_outline, obscureText: true),
+            ],
+
+            const SizedBox(height: 20),
+
+            // AKSİYON DÜĞMELERİ
+            if (controller.isTrunkMode) ...[
+              const Text("DESTINATION", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+              const SizedBox(height: 12),
+              _input(controller.toController, "Target Extension (e.g., 9999)", Icons.call_made, keyboardType: TextInputType.phone),
+              const SizedBox(height: 30),
+              _buildBigButton("INJECT CALL", Icons.rocket_launch, controller.makeCall, const Color(0xFF00FF9D)),
+            ] else ...[
+              // SIP ACCOUNT MODU
+              if (controller.sipStatus != "REGISTERED") ...[
+                const SizedBox(height: 20),
+                _buildBigButton("REGISTER", Icons.how_to_reg, controller.registerAccount, Colors.blueAccent),
+                const SizedBox(height: 12),
+                Center(child: Text("Status: ${controller.sipStatus}", style: const TextStyle(color: Colors.white54, fontSize: 12))),
+              ] else ...[
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green)),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [Icon(Icons.check_circle, color: Colors.green, size: 18), SizedBox(width: 8), Text("REGISTERED SECURELY", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))],
+                  ),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.rocket_launch, color: Color(0xFF00FF9D), size: 24),
-                    SizedBox(width: 16),
-                    Text("INJECT CALL", style: TextStyle(color: Color(0xFF00FF9D), fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
-                  ],
-                ),
-              ),
-            ),
+                const SizedBox(height: 20),
+                const Text("DESTINATION", style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+                const SizedBox(height: 12),
+                _input(controller.toController, "Target Extension (e.g., 2002)", Icons.call_made, keyboardType: TextInputType.phone),
+                const SizedBox(height: 30),
+                _buildBigButton("CALL", Icons.call, controller.makeCall, const Color(0xFF00FF9D)),
+              ]
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBigButton(String text, IconData icon, VoidCallback onTap, Color color) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 65,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color, width: 1.5),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 1)],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(width: 16),
+            Text(text, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2.0)),
           ],
         ),
       ),
@@ -190,7 +246,7 @@ class DialerScreen extends StatelessWidget {
         ),
 
         GestureDetector(
-          onTap: controller.toggleCall,
+          onTap: controller.endCall, // DÜZELTİLDİ: Sadece kapatma
           child: Container(
             height: 80, width: 80,
             decoration: const BoxDecoration(
@@ -225,10 +281,11 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
-  Widget _input(TextEditingController ctrl, String label, IconData icon, {bool isCompact = false, TextInputType keyboardType = TextInputType.text}) {
+  Widget _input(TextEditingController ctrl, String label, IconData icon, {bool isCompact = false, TextInputType keyboardType = TextInputType.text, bool obscureText = false}) {
     return TextField(
       controller: ctrl,
       keyboardType: keyboardType,
+      obscureText: obscureText,
       style: TextStyle(fontSize: isCompact ? 13 : 15, fontFamily: 'monospace', color: Colors.white),
       decoration: InputDecoration(
         labelText: label,

@@ -14,16 +14,19 @@ class CallController extends ChangeNotifier {
   final TextEditingController portController = TextEditingController();
   final TextEditingController toController = TextEditingController();
   final TextEditingController fromController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController(); // YENİ: Şifre
 
   // Telemetry & UI State
   final List<TelemetryEntry> telemetryLogs = [];
   final ScrollController scrollController = ScrollController();
   
+  bool isTrunkMode = false; // YENİ: false = SIP Account, true = Raw Trunk
   bool isCalling = false;
   bool isMediaFlowing = false;
   bool showDebugConsole = false;
   bool isSpeakerOn = false;
   bool isMuted = false;
+  bool _isEngineStarted = false;
   
   int rxPackets = 0;
   int txPackets = 0;
@@ -36,12 +39,28 @@ class CallController extends ChangeNotifier {
     _loadProfile();
   }
 
+  Future<void> initEngineIfNeeded() async {
+    if (_isEngineStarted) return;
+    try {
+      final stream = startEngine();
+      stream.listen(
+        (event) => _processEvent(event),
+        onError: (e) => _processEvent("Error(\"Engine Stream Fail: $e\")")
+      );
+      _isEngineStarted = true;
+    } catch (e) {
+      debugPrint("Engine Start Error: $e");
+    }
+  }
+
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    ipController.text = prefs.getString('targetIp') ?? "";
-    portController.text = prefs.getString('targetPort') ?? "";
+    ipController.text = prefs.getString('targetIp') ?? "service.sentiric.cloud";
+    portController.text = prefs.getString('targetPort') ?? "5060";
     toController.text = prefs.getString('toUser') ?? "";
     fromController.text = prefs.getString('fromUser') ?? "";
+    passwordController.text = prefs.getString('password') ?? "";
+    isTrunkMode = prefs.getBool('isTrunkMode') ?? false;
     notifyListeners();
   }
 
@@ -51,6 +70,17 @@ class CallController extends ChangeNotifier {
     await prefs.setString('targetPort', portController.text.trim());
     await prefs.setString('toUser', toController.text.trim());
     await prefs.setString('fromUser', fromController.text.trim());
+    await prefs.setString('password', passwordController.text.trim());
+    await prefs.setBool('isTrunkMode', isTrunkMode);
+  }
+
+  void setMode(bool trunkMode) {
+    isTrunkMode = trunkMode;
+    // Mod değiştiğinde state sıfırla
+    if (!isCalling) {
+      sipStatus = "STANDBY";
+      notifyListeners();
+    }
   }
 
   void toggleDebugConsole() {
@@ -69,12 +99,9 @@ class CallController extends ChangeNotifier {
     }
   }
 
-void toggleMute() {
+  void toggleMute() {
     isMuted = !isMuted;
-    
-    // [YENİ]: Rust (SDK) motoruna Mute komutunu gönderiyoruz
     setMute(muted: isMuted); 
-    
     notifyListeners();
   }
 
@@ -115,7 +142,7 @@ void toggleMute() {
       
       if (sipStatus == "CONNECTED") {
         _startDurationTimer();
-      } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE") {
+      } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE" || sipStatus == "AUTHFAILED") {
         isCalling = false;
         isMediaFlowing = false;
         _stopDurationTimer();
@@ -147,74 +174,78 @@ void toggleMute() {
     }
   }
 
-  Future<void> toggleCall() async {
-    if (isCalling) {
-      await endSipCall();
-      isCalling = false;
-      isMediaFlowing = false;
-      sipStatus = "TERMINATING...";
-      _stopDurationTimer();
-      platform.invokeMethod('setNormalMode').catchError((_) {});
+  // YENİ: Hesap Kaydı (Şifreli)
+  Future<void> registerAccount() async {
+    await saveProfile();
+    await initEngineIfNeeded();
+
+    sipStatus = "REGISTERING...";
+    notifyListeners();
+
+    try {
+      await registerSipAccount(
+        targetIp: ipController.text.trim(),
+        targetPort: int.parse(portController.text.trim()),
+        user: fromController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+    } catch (e) {
+      _processEvent("Error(\"Register Fail: $e\")");
+    }
+  }
+
+  // YENİ: Çağrı Başlatma (Trunk veya Kayıtlı)
+  Future<void> makeCall() async {
+    if (isCalling) return;
+    await saveProfile();
+    await initEngineIfNeeded();
+
+    PermissionStatus status = await Permission.microphone.status;
+    if (!status.isGranted) status = await Permission.microphone.request();
+
+    if (!status.isGranted) {
+      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
       notifyListeners();
       return;
     }
 
-    await saveProfile();
+    isSpeakerOn = false;
+    try { await platform.invokeMethod('setInCallMode'); } catch (e) { debugPrint("InCall Mode Error: $e"); }
 
-    PermissionStatus status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      status = await Permission.microphone.request();
-    }
+    telemetryLogs.clear();
+    isCalling = true;
+    isMediaFlowing = false;
+    rxPackets = 0;
+    txPackets = 0;
+    callDurationSeconds = 0;
+    sipStatus = "DIALING...";
+    notifyListeners();
 
-    if (status.isGranted) {
-      isSpeakerOn = false;
-      try {
-        await platform.invokeMethod('setInCallMode');
-      } catch (e) {
-        debugPrint("InCall Mode Error: $e");
-      }
-
-      telemetryLogs.clear();
-      isCalling = true;
-      isMediaFlowing = false;
-      rxPackets = 0;
-      txPackets = 0;
-      callDurationSeconds = 0;
-      sipStatus = "DIALING...";
-      notifyListeners();
-
-      try {
-        final stream = startSipCall(
-          targetIp: ipController.text.trim(),
-          targetPort: int.parse(portController.text.trim()),
-          toUser: toController.text.trim(),
-          fromUser: fromController.text.trim(),
-        );
-
-        stream.listen(
-          (event) => _processEvent(event),
-          onDone: () {
-            isCalling = false;
-            sipStatus = "DISCONNECTED";
-            _stopDurationTimer();
-            platform.invokeMethod('setNormalMode').catchError((_) {});
-            notifyListeners();
-          },
-          onError: (e) {
-            _processEvent("Error(\"Stream Fail: $e\")");
-            platform.invokeMethod('setNormalMode').catchError((_) {});
-          },
-        );
-      } catch (e) {
-        _processEvent("Error(\"Init Fail: $e\")");
-        isCalling = false;
-        platform.invokeMethod('setNormalMode').catchError((_) {});
-        notifyListeners();
-      }
-    } else {
-      _addLog(TelemetryEntry(message: "❌ MIC PERMISSION DENIED", level: TelemetryLevel.error));
+    try {
+      await startSipCall(
+        targetIp: ipController.text.trim(),
+        targetPort: int.parse(portController.text.trim()),
+        toUser: toController.text.trim(),
+        fromUser: fromController.text.trim(),
+      );
+    } catch (e) {
+      _processEvent("Error(\"Call Fail: $e\")");
+      isCalling = false;
+      platform.invokeMethod('setNormalMode').catchError((_) {});
       notifyListeners();
     }
+  }
+
+  // Kapatma
+  Future<void> endCall() async {
+    if (!isCalling) return;
+    await endSipCall();
+    isCalling = false;
+    isMediaFlowing = false;
+    sipStatus = "TERMINATING...";
+    _stopDurationTimer();
+    platform.invokeMethod('setNormalMode').catchError((_) {});
+    notifyListeners();
   }
 
   @override
@@ -224,6 +255,7 @@ void toggleMute() {
     portController.dispose();
     toController.dispose();
     fromController.dispose();
+    passwordController.dispose();
     scrollController.dispose();
     super.dispose();
   }

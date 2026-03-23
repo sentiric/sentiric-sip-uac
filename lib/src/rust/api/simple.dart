@@ -11,10 +11,25 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 Future<void> initLogger() => RustLib.instance.api.crateApiSimpleInitLogger();
 
-/// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
-Future<void> endSipCall() => RustLib.instance.api.crateApiSimpleEndSipCall();
+/// 1. Motoru Arka Planda Başlatır ve Sürekli Dinler (YENİ)
+Stream<String> startEngine() =>
+    RustLib.instance.api.crateApiSimpleStartEngine();
 
-Stream<String> startSipCall({
+/// 2. SIP Hesabı ile Kayıt İşlemi (YENİ)
+Future<void> registerSipAccount({
+  required String targetIp,
+  required int targetPort,
+  required String user,
+  required String password,
+}) => RustLib.instance.api.crateApiSimpleRegisterSipAccount(
+  targetIp: targetIp,
+  targetPort: targetPort,
+  user: user,
+  password: password,
+);
+
+/// 3. Aramayı Başlatma (Güncellendi: Artık Stream döndürmez, komut atar)
+Future<void> startSipCall({
   required String targetIp,
   required int targetPort,
   required String toUser,
@@ -26,6 +41,9 @@ Stream<String> startSipCall({
   fromUser: fromUser,
 );
 
+/// Çağrıyı aniden kesmek için Flutter tarafından çağrılır.
+Future<void> endSipCall() => RustLib.instance.api.crateApiSimpleEndSipCall();
+
 Future<void> updateAudioSettings({
   required double micGain,
   required double speakerGain,
@@ -36,7 +54,6 @@ Future<void> updateAudioSettings({
   enableAec: enableAec,
 );
 
-/// Aktif çağrıya in-band RTP DTMF tonu gönderir.
 Future<void> sendSipDtmf({required String key}) =>
     RustLib.instance.api.crateApiSimpleSendSipDtmf(key: key);
 
