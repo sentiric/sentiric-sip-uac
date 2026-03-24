@@ -3,7 +3,8 @@ name: sentiric_sip_uac
 description: "Sentiric Mobile SIP UAC for field testing and validation."
 publish_to: 'none'
 
-version: 1.7.1+13
+# [VERSION BUMP]: 1.7.1+13 -> 1.7.2+14 (Test Phase Readiness)
+version: 1.7.2+14
 
 environment:
   sdk: ^3.10.4
