@@ -1,7 +1,7 @@
 // Dosya: sentiric-sip-uac/rust/src/api/simple.rs
 use sentiric_telecom_client_sdk::{UacEvent, ClientCommand}; 
 use crate::frb_generated::StreamSink;
-use log::info;
+use tracing::info; // [ARCH-COMPLIANCE] SUTS v4.0 için log yerine tracing kullanıldı.
 use tokio::sync::mpsc;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -26,7 +26,8 @@ pub fn init_logger() {
             .with_max_level(log::LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    log::info!("✅ Android Logger Initialized via SDK");
+    //[ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
+    info!(event="LOGGER_INIT", "✅ Android Logger Initialized via SDK");
 }
 
 #[cfg(not(target_os = "android"))]
@@ -35,7 +36,8 @@ pub fn init_logger() {
     let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .try_init();
-    log::info!("✅ Desktop/Linux Logger Initialized via SDK");
+    //[ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
+    info!(event="LOGGER_INIT", "✅ Desktop/Linux Logger Initialized via SDK");
 }
 
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
@@ -56,7 +58,8 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);
-            info!("[SDK-EVENT] {}", msg);
+            // [ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
+            info!(event="SDK_BRIDGE_EVENT", "[SDK-EVENT] {}", msg);
             let _ = stream_sink.add(msg);
         }
     });

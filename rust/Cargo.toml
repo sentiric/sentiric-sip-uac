@@ -1,14 +1,15 @@
 # Dosya: sentiric-sip-uac/rust/Cargo.toml
 [package]
 name = "uac"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.4.2" }
+#[ARCH-COMPLIANCE] SDK bağımlılığı v0.4.3 SUTS v4.0 düzeltmesini alacak şekilde güncellendi.
+sentiric-telecom-client-sdk = { git = "https://github.com/sentiric/sentiric-telecom-client-sdk.git", tag = "v0.4.3" }
 
 flutter_rust_bridge = "=2.11.1"
 tokio = { version = "1", features = ["full"] }
