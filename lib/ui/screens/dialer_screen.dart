@@ -79,10 +79,15 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
+//[ARCH-COMPLIANCE] Null-safety fix for activeProfile to prevent UI thread panic
   Widget _buildDialpad(BuildContext context) {
     final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Profilin null olma durumunu güvenli hale getiriyoruz
+        final isTrunkMode = controller.activeProfile?.isTrunk ?? false;
+        final isRegistered = controller.sipStatus == "REGISTERED";
+        
         return SingleChildScrollView(
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -96,7 +101,10 @@ class DialerScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 36, color: controller.dialedNumber.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
                   ),
                 ),
-                Text(controller.activeProfile!.isTrunk ? "MODE: RAW TRUNK (Direct IP)" : "Status: ${controller.sipStatus}", style: TextStyle(color: controller.sipStatus == "REGISTERED" || controller.activeProfile!.isTrunk ? Colors.green : Colors.white54, fontSize: 12)),
+                Text(
+                  isTrunkMode ? "MODE: RAW TRUNK (Direct IP)" : "Status: ${controller.sipStatus}", 
+                  style: TextStyle(color: isRegistered || isTrunkMode ? Colors.green : Colors.white54, fontSize: 12)
+                ),
                 const SizedBox(height: 30),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),

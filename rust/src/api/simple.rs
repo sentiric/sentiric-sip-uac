@@ -1,7 +1,13 @@
 // Dosya: sentiric-sip-uac/rust/src/api/simple.rs
+
+// SUTS v4.0 (JSON Loglama) kuralı Backend Mikroservisleri (Agent, Workflow, B2BUA vb.) için zorunludur. Ancak UAC bir Edge Client (Mobil Uygulama) olduğu için bu kuraldan muaftır. Mobil geliştirmede standart logcat düz metni (plain text) esastır.
+
+// Android ekosisteminde, yerel (native) logların adb logcat'e düşebilmesi için Rust tarafında kullandığımız android_logger kütüphanesi SADECE standart log kütüphanesini dinler. Biz araya SUTS v4.0 standartlarını uydurmak için tracing kütüphanesini soktuğumuzda, android_logger bunu anlayamadı ve tüm loglar sessizce uzay boşluğuna (void) atıldı. Uygulamanın çalışmasında bir sorun yok, arka planda çağrı atıyor ama ekrana ve terminale hiçbir şey yazdırmıyor.
+
+// [ARCH-COMPLIANCE] Mobil cihazlar için 'tracing' yerine standart 'log' kütüphanesine dönüldü.
+use log::info; 
 use sentiric_telecom_client_sdk::{UacEvent, ClientCommand}; 
 use crate::frb_generated::StreamSink;
-use tracing::info; // [ARCH-COMPLIANCE] SUTS v4.0 için log yerine tracing kullanıldı.
 use tokio::sync::mpsc;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -26,8 +32,8 @@ pub fn init_logger() {
             .with_max_level(log::LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    //[ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
-    info!(event="LOGGER_INIT", "✅ Android Logger Initialized via SDK");
+    // Eski haline getirildi (event paramı silindi)
+    info!("✅ Android Logger Initialized via SDK");
 }
 
 #[cfg(not(target_os = "android"))]
@@ -36,8 +42,8 @@ pub fn init_logger() {
     let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .try_init();
-    //[ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
-    info!(event="LOGGER_INIT", "✅ Desktop/Linux Logger Initialized via SDK");
+    // Eski haline getirildi
+    info!("✅ Desktop/Linux Logger Initialized via SDK");
 }
 
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
@@ -55,11 +61,12 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
     });
 
     let stream_sink = sink.clone(); 
+    
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);
-            // [ARCH-COMPLIANCE] ARCH-007 İhlali giderildi (event eklendi).
-            info!(event="SDK_BRIDGE_EVENT", "[SDK-EVENT] {}", msg);
+            // Eski haline getirildi
+            info!("[SDK-EVENT] {}", msg);
             let _ = stream_sink.add(msg);
         }
     });
