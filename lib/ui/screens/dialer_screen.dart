@@ -79,12 +79,10 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
-//[ARCH-COMPLIANCE] Null-safety fix for activeProfile to prevent UI thread panic
   Widget _buildDialpad(BuildContext context) {
     final keys =['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Profilin null olma durumunu güvenli hale getiriyoruz
         final isTrunkMode = controller.activeProfile?.isTrunk ?? false;
         final isRegistered = controller.sipStatus == "REGISTERED";
         
@@ -96,9 +94,15 @@ class DialerScreen extends StatelessWidget {
               children:[
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Text(
-                    controller.dialedNumber.isEmpty ? "Enter Number" : controller.dialedNumber,
-                    style: TextStyle(fontSize: 36, color: controller.dialedNumber.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
+                  // [UX FIX] ValueListenableBuilder ile setState darboğazı kaldırıldı.
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: controller.dialedNumber,
+                    builder: (context, number, _) {
+                      return Text(
+                        number.isEmpty ? "Enter Number" : number,
+                        style: TextStyle(fontSize: 36, color: number.isEmpty ? Colors.white24 : Colors.white, letterSpacing: 2.0, fontFamily: 'monospace'),
+                      );
+                    },
                   ),
                 ),
                 Text(
@@ -128,12 +132,12 @@ class DialerScreen extends StatelessWidget {
                   children:[
                     const SizedBox(width: 50),
                     GestureDetector(
-                      onTap: () => controller.makeCall(controller.dialedNumber),
+                      onTap: () => controller.makeCall(controller.dialedNumber.value),
                       child: Container(height: 75, width: 75, decoration: BoxDecoration(color: const Color(0xFF00FF9D).withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00FF9D), width: 2)), child: const Icon(Icons.call, color: Color(0xFF00FF9D), size: 36)),
                     ),
                     GestureDetector(
                       onTap: controller.backspaceDial,
-                      onLongPress: () { while(controller.dialedNumber.isNotEmpty) { controller.backspaceDial(); } },
+                      onLongPress: () { controller.dialedNumber.value = ""; },
                       child: const SizedBox(height: 50, width: 50, child: Icon(Icons.backspace, color: Colors.white54, size: 24)),
                     ),
                   ],
@@ -154,7 +158,6 @@ class DialerScreen extends StatelessWidget {
           children:[
             const Icon(Icons.ring_volume, size: 80, color: Color(0xFF00FF9D)),
             const SizedBox(height: 40),
-            // [MİMARİ DÜZELTME]: Arayanın temizlenmiş ismini (veya numarasını) göster
             Text(controller.incomingCaller, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w200, color: Colors.white)),
             const SizedBox(height: 80),
             Row(
@@ -175,7 +178,6 @@ class DialerScreen extends StatelessWidget {
           const SizedBox(height: 40),
           Column(
             children:[
-              // Giden aramada da rehberden isim çekme (opsiyonel bonus)
               Text(
                 controller.activeContacts.where((c) => c.number == controller.currentCallTarget).firstOrNull?.name ?? controller.currentCallTarget, 
                 style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w200, color: Colors.white, letterSpacing: 2.0)

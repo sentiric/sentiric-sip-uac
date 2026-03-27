@@ -21,7 +21,9 @@ class CallController extends ChangeNotifier {
   List<PhoneContact> get activeContacts => _allContacts.where((c) => c.profileId == activeProfile?.id).toList();
   List<CallRecord> get activeHistory => _allHistory.where((h) => h.profileId == activeProfile?.id).toList();
 
-  String dialedNumber = "";
+  // [UX FIX] Zero-latency dialpad için ValueNotifier yapısı.
+  final ValueNotifier<String> dialedNumber = ValueNotifier<String>("");
+  
   final List<TelemetryEntry> telemetryLogs =[];
   final ScrollController scrollController = ScrollController();
   
@@ -41,6 +43,21 @@ class CallController extends ChangeNotifier {
   String currentCallTarget = "";
   bool isIncomingCall = false;
   Timer? _durationTimer;
+
+  // [UX FIX] Başka bir sekmeden çağrı geldiğinde ana sekmeye yönlendirme Callback'i
+  VoidCallback? onNavigateToDialer;
+
+  // [UX FIX] FRB Event Throttler
+  bool _updateScheduled = false;
+  void _scheduleUiUpdate() {
+    if (!_updateScheduled) {
+      _updateScheduled = true;
+      Future.delayed(const Duration(milliseconds: 64), () {
+        notifyListeners();
+        _updateScheduled = false;
+      });
+    }
+  }
 
   CallController() { _initStorage(); }
 
@@ -96,18 +113,18 @@ class CallController extends ChangeNotifier {
     if(isCalling) endCall();
     activeProfile = p;
     sipStatus = "STANDBY";
-    dialedNumber = ""; 
+    dialedNumber.value = ""; 
     saveState();
   }
 
   void appendDial(String digit) {
-    if (dialedNumber.length < 20) dialedNumber += digit;
-    notifyListeners();
+    if (dialedNumber.value.length < 20) dialedNumber.value += digit;
   }
 
   void backspaceDial() {
-    if (dialedNumber.isNotEmpty) dialedNumber = dialedNumber.substring(0, dialedNumber.length - 1);
-    notifyListeners();
+    if (dialedNumber.value.isNotEmpty) {
+      dialedNumber.value = dialedNumber.value.substring(0, dialedNumber.value.length - 1);
+    }
   }
 
   Future<void> initEngineIfNeeded() async {
@@ -124,15 +141,12 @@ class CallController extends ChangeNotifier {
     }
   }
 
-  //[MİMARİ DÜZELTME]: Gelen ham SIP Uri'sini temizler ve rehberde arar.
   String _parseCallerId(String rawFrom) {
-    // rawFrom örneği: "<sip:2001@34.122.40.122>;tag=tag-f7d"
     try {
       final sipRegex = RegExp(r'sip:([^@>]+)');
       final match = sipRegex.firstMatch(rawFrom);
       String parsedNumber = match != null ? match.group(1)! : "Unknown";
       
-      // Rehberde Ara
       final contact = activeContacts.where((c) => c.number == parsedNumber).firstOrNull;
       return contact != null ? contact.name : parsedNumber;
     } catch (_) {
@@ -147,13 +161,12 @@ class CallController extends ChangeNotifier {
       final fromMatch = RegExp(r'from:\s*"([^"]+)"').firstMatch(raw);
       final rawFrom = fromMatch?.group(1) ?? "Unknown";
       
-      incomingCaller = _parseCallerId(rawFrom); // Temizle ve Eşleştir
+      incomingCaller = _parseCallerId(rawFrom); 
       
       sipStatus = "INCOMING CALL";
       isCalling = true; 
       isIncomingCall = true;
       
-      // CDR kaydı için ham numara (isim değil, arayan numara)
       final sipRegex = RegExp(r'sip:([^@>]+)');
       final match = sipRegex.firstMatch(rawFrom);
       currentCallTarget = match != null ? match.group(1)! : "Unknown";
@@ -161,8 +174,10 @@ class CallController extends ChangeNotifier {
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(seconds: 1), () { if(sipStatus == "INCOMING CALL") HapticFeedback.heavyImpact(); });
       
+      onNavigateToDialer?.call(); // [UX FIX] Çağrı gelince ekranı aktifleştir
+      
       _addLog(TelemetryEntry(message: "🔔 Incoming call from: $incomingCaller", level: TelemetryLevel.status));
-      notifyListeners();
+      notifyListeners(); // Hızlı tepki için anında render.
       return;
     }
 
@@ -176,6 +191,7 @@ class CallController extends ChangeNotifier {
       
       if (sipStatus == "CONNECTED") {
         _startDurationTimer();
+        notifyListeners(); // Acil UI güncellemesi
       } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE" || sipStatus == "AUTHFAILED") {
         
         if (isCalling && currentCallTarget.isNotEmpty && activeProfile != null) {
@@ -197,12 +213,15 @@ class CallController extends ChangeNotifier {
         txPackets = 0;
         _stopDurationTimer();
         platform.invokeMethod('setNormalMode').catchError((_) {});
+        notifyListeners();
       }
       _addLog(entry);
     } else {
       _addLog(entry);
     }
-    notifyListeners();
+    
+    // [UX FIX] Sürekli güncellenen statüler için Throttle 
+    _scheduleUiUpdate();
   }
 
   void toggleDebugConsole() { showDebugConsole = !showDebugConsole; notifyListeners(); _scrollToBottom(); }
@@ -249,6 +268,9 @@ class CallController extends ChangeNotifier {
     currentCallTarget = targetNumber;
     isIncomingCall = false;
     isSpeakerOn = false;
+    
+    onNavigateToDialer?.call(); // [UX FIX] Rehberden aranırsa ana ekrana at.
+    
     try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('setInCallMode'); } catch (e) {}
 
     telemetryLogs.clear();

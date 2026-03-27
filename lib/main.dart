@@ -56,6 +56,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final CallController _callController = CallController();
 
   @override
+  void initState() {
+    super.initState();
+    // [UX FIX] CallController'dan gelen navigasyon isteklerini dinle.
+    _callController.onNavigateToDialer = () {
+      if (mounted && _currentIndex != 0) {
+        setState(() => _currentIndex = 0);
+      }
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(

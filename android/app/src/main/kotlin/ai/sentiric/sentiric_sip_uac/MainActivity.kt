@@ -3,6 +3,7 @@ package ai.sentiric.sentiric_sip_uac
 import android.content.Context
 import android.media.AudioManager
 import android.os.Bundle
+import android.os.PowerManager //[UX FIX] WakeLock
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -12,6 +13,8 @@ class MainActivity: FlutterActivity() {
     private lateinit var audioManager: AudioManager
     private var previousMusicVolume: Int = 0
     private var previousMode: Int = AudioManager.MODE_NORMAL
+    // [UX FIX] Cihaz arka plandayken CPU'nun uyumasını engeller.
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,7 +34,6 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "setInCallMode" -> {
-                    // MİMARİNİN GEREĞİ: Bu fonksiyon çağrı başlamadan önce 1 KERE çağrılır.
                     previousMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                     previousMode = audioManager.mode
                     
@@ -39,25 +41,32 @@ class MainActivity: FlutterActivity() {
                     val targetVol = (maxMusicVol * 0.8).toInt() 
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
 
-                    // Modu iletişime al ve odak iste. (AAudio/cpal stream başlamadan hemen önce olmalı)
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                     audioManager.isSpeakerphoneOn = false
                     audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                     
+                    // [UX FIX] Arka planda kesintisiz çağrı için WakeLock alınıyor.
+                    if (wakeLock == null) {
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SentiricUAC::CallWakeLock")
+                    }
+                    wakeLock?.takeIf { !it.isHeld }?.acquire()
+
                     result.success(null)
                 }
                 "toggleSpeaker" -> {
-                    // MİMARİNİN GEREĞİ: Çağrı ortasında AAudio stream'i öldürmemek için SADECE hoparlör rotası değişir.
                     val speakerOn = call.argument<Boolean>("speakerOn") ?: false
                     audioManager.isSpeakerphoneOn = speakerOn
                     result.success(null)
                 }
                 "setNormalMode" -> {
-                    // Çağrı bittiğinde eski duruma dön.
                     audioManager.mode = previousMode
                     audioManager.isSpeakerphoneOn = false
                     audioManager.abandonAudioFocus(null)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, previousMusicVolume, 0)
+                    
+                    // [UX FIX] Çağrı bittiğinde CPU WakeLock'u serbest bırakılır.
+                    wakeLock?.takeIf { it.isHeld }?.release()
                     
                     result.success(null)
                 }
