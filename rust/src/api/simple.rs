@@ -28,24 +28,22 @@ pub extern "system" fn JNI_OnLoad(vm: jni::JavaVM, _res: *mut std::ffi::c_void) 
 
 #[cfg(target_os = "android")]
 pub fn init_logger() {
-    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMU");
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); // PCMU -> PCMA olarak değiştirildi
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Info)
             .with_tag("SENTIRIC-MOBILE"),
     );
-    // Eski haline getirildi (event paramı silindi)
-    info!("✅ Android Logger Initialized via SDK");
+    log::info!("✅ Android Logger Initialized via SDK");
 }
 
 #[cfg(not(target_os = "android"))]
 pub fn init_logger() {
-    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMU");
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); // PCMU -> PCMA olarak değiştirildi
     let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .try_init();
-    // Eski haline getirildi
-    info!("✅ Desktop/Linux Logger Initialized via SDK");
+    log::info!("✅ Desktop/Linux Logger Initialized via SDK");
 }
 
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
