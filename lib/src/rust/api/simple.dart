@@ -11,6 +11,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 Future<void> initLogger() => RustLib.instance.api.crateApiSimpleInitLogger();
 
+Future<String> getCoreVersions() =>
+    RustLib.instance.api.crateApiSimpleGetCoreVersions();
+
 Stream<String> startEngine() =>
     RustLib.instance.api.crateApiSimpleStartEngine();
 

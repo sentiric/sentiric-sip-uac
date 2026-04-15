@@ -28,7 +28,7 @@ pub extern "system" fn JNI_OnLoad(vm: jni::JavaVM, _res: *mut std::ffi::c_void) 
 
 #[cfg(target_os = "android")]
 pub fn init_logger() {
-    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); // PCMU -> PCMA olarak değiştirildi
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); 
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Info)
@@ -39,11 +39,24 @@ pub fn init_logger() {
 
 #[cfg(not(target_os = "android"))]
 pub fn init_logger() {
-    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); // PCMU -> PCMA olarak değiştirildi
+    std::env::set_var("PREFERRED_AUDIO_CODEC", "PCMA"); 
     let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .try_init();
     log::info!("✅ Desktop/Linux Logger Initialized via SDK");
+}
+
+// [YENİ] Dinamik Versiyonları Dart (Flutter) Tarafına İleten Fonksiyon
+pub fn get_core_versions() -> String {
+    let app_version = env!("CARGO_PKG_VERSION");
+    let sdk_version = option_env!("SDK_VERSION").unwrap_or("Unknown");
+    let sip_version = option_env!("SIP_CORE_VERSION").unwrap_or("Unknown");
+    let rtp_version = option_env!("RTP_CORE_VERSION").unwrap_or("Unknown");
+    
+    format!(
+        "Sentiric UAC v{}\nTelecom SDK v{} • SIP Core v{} • RTP Core v{}",
+        app_version, sdk_version, sip_version, rtp_version
+    )
 }
 
 pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
@@ -65,16 +78,19 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
 
     let stream_sink = sink.clone();
 
-    // [YENİ]: SDK ve Core versiyonlarını Debug Console'a bas
+    // [YENİ]: SDK ve Core versiyonlarını dinamik olarak Console'a bas
+    let sdk_version = option_env!("SDK_VERSION").unwrap_or("Unknown");
+    let sip_version = option_env!("SIP_CORE_VERSION").unwrap_or("Unknown");
+    let rtp_version = option_env!("RTP_CORE_VERSION").unwrap_or("Unknown");
+
     let _ = stream_sink.add(format!(
-        "Log(\"🚀 Booting Sentiric Engine (Native v{} | SDK v0.4.15 | SIP v1.5.6 | RTP v1.6.2)\")",
-        env!("CARGO_PKG_VERSION")
+        "Log(\"🚀 Booting Sentiric Engine (Native v{} | SDK v{} | SIP v{} | RTP v{})\")",
+        env!("CARGO_PKG_VERSION"), sdk_version, sip_version, rtp_version
     ));    
 
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);
-            // Eski haline getirildi
             info!("[SDK-EVENT] {}", msg);
             let _ = stream_sink.add(msg);
         }

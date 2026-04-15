@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../controllers/call_controller.dart';
 import '../../models.dart';
+import '../../src/rust/api/simple.dart'; // [YENİ] getCoreVersions() için import edildi
 
 class ProfilesScreen extends StatelessWidget {
   final CallController controller;
@@ -48,14 +49,19 @@ class ProfilesScreen extends StatelessWidget {
                   },
                 ),
               ),
-              // [YENİ]: VERSİYON GÖSTERGESİ (FOOTER)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  "Sentiric UAC v1.8.7\nTelecom SDK v0.4.15 • SIP Core v1.5.6 • RTP Core v1.6.2",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.0, height: 1.5),
-                ),
+              // [YENİ]: DİNAMİK VERSİYON GÖSTERGESİ (FOOTER)
+              FutureBuilder<String>(
+                future: getCoreVersions(),
+                builder: (context, snapshot) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      snapshot.data ?? "Loading core versions...",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.0, height: 1.5),
+                    ),
+                  );
+                }
               ),
             ],
           ),
@@ -69,7 +75,6 @@ class ProfilesScreen extends StatelessWidget {
     );
   }
 
-  //[MİMARİ DÜZELTME]: Edit yeteneği ve Trunk modu için dinamik label eklendi
   void _showAddProfile(BuildContext context, {SipProfile? existingProfile}) {
     final nameC = TextEditingController(text: existingProfile?.name ?? "");
     final ipC = TextEditingController(text: existingProfile?.ip ?? "");
@@ -94,7 +99,6 @@ class ProfilesScreen extends StatelessWidget {
               activeColor: const Color(0xFF00FF9D),
               onChanged: (val) => setState(() => isTrunk = val)
             ),
-            // Trunk modunda Caller ID, Account modunda SIP Username
             TextField(controller: userC, style: const TextStyle(color: Colors.white), decoration: InputDecoration(labelText: isTrunk ? "Caller ID Number" : "SIP Username")),
             if (!isTrunk) ...[
               TextField(controller: passC, obscureText: true, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: "Password")),
@@ -106,7 +110,6 @@ class ProfilesScreen extends StatelessWidget {
           TextButton(onPressed: () {
             if (nameC.text.isNotEmpty && ipC.text.isNotEmpty) {
               if (existingProfile != null) {
-                // Update
                 existingProfile.name = nameC.text;
                 existingProfile.ip = ipC.text;
                 existingProfile.port = portC.text;
@@ -114,7 +117,6 @@ class ProfilesScreen extends StatelessWidget {
                 existingProfile.password = isTrunk ? "" : passC.text;
                 existingProfile.isTrunk = isTrunk;
               } else {
-                // Add
                 controller.profiles.add(SipProfile(id: DateTime.now().millisecondsSinceEpoch.toString(), name: nameC.text, ip: ipC.text, port: portC.text, user: userC.text, password: isTrunk ? "" : passC.text, isTrunk: isTrunk));
               }
               controller.saveState();
@@ -218,7 +220,6 @@ class HistoryScreen extends StatelessWidget {
               } else {
                 color = h.status == "ANSWERED" ? const Color(0xFF00FF9D) : Colors.white54;
               }
-              // Geçmişte rehber ismi göstermek için arama
               final contact = controller.activeContacts.where((c) => c.number == h.targetNumber).firstOrNull;
               final displayName = contact != null ? contact.name : h.targetNumber;
 
