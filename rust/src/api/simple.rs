@@ -48,14 +48,16 @@ pub fn init_logger() {
 
 // [YENİ] Dinamik Versiyonları Dart (Flutter) Tarafına İleten Fonksiyon
 pub fn get_core_versions() -> String {
-    let app_version = env!("CARGO_PKG_VERSION");
+    let app_version = option_env!("FLUTTER_APP_VERSION").unwrap_or("Unknown");
+    let core_version = env!("CARGO_PKG_VERSION"); // rust/Cargo.toml versiyonu
     let sdk_version = option_env!("SDK_VERSION").unwrap_or("Unknown");
     let sip_version = option_env!("SIP_CORE_VERSION").unwrap_or("Unknown");
     let rtp_version = option_env!("RTP_CORE_VERSION").unwrap_or("Unknown");
     
+    // Düzenli 2 satırlık kompakt görünüm
     format!(
-        "Sentiric UAC v{}\nTelecom SDK v{} • SIP Core v{} • RTP Core v{}",
-        app_version, sdk_version, sip_version, rtp_version
+        "UAC App v{} (Native Core v{})\nSDK v{} • SIP v{} • RTP v{}",
+        app_version, core_version, sdk_version, sip_version, rtp_version
     )
 }
 
@@ -78,20 +80,21 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
 
     let stream_sink = sink.clone();
 
-    // [YENİ]: SDK ve Core versiyonlarını dinamik olarak Console'a bas
+    // Dinamik versiyonları Console loguna da (Debug için) basalım
+    let app_version = option_env!("FLUTTER_APP_VERSION").unwrap_or("Unknown");
     let sdk_version = option_env!("SDK_VERSION").unwrap_or("Unknown");
     let sip_version = option_env!("SIP_CORE_VERSION").unwrap_or("Unknown");
     let rtp_version = option_env!("RTP_CORE_VERSION").unwrap_or("Unknown");
 
     let _ = stream_sink.add(format!(
-        "Log(\"🚀 Booting Sentiric Engine (Native v{} | SDK v{} | SIP v{} | RTP v{})\")",
-        env!("CARGO_PKG_VERSION"), sdk_version, sip_version, rtp_version
+        "Log(\"🚀 Booting Sentiric Engine (App v{} | Core v{} | SDK v{} | SIP v{} | RTP v{})\")",
+        app_version, env!("CARGO_PKG_VERSION"), sdk_version, sip_version, rtp_version
     ));    
 
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);
-            info!("[SDK-EVENT] {}", msg);
+            log::info!("[SDK-EVENT] {}", msg);
             let _ = stream_sink.add(msg);
         }
     });

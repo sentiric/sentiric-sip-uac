@@ -12,11 +12,11 @@ fn main() {
         println!("cargo:rustc-link-lib=c++_shared");
     }
 
-    // [ARCH-COMPLIANCE] Dinamik Versiyon Okuma (Cargo.lock parse)
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
-    let lock_path = Path::new(&manifest_dir).join("Cargo.lock");
 
-    if let Ok(lock_content) = fs::read_to_string(lock_path) {
+    // 1. CARGO.LOCK İÇİNDEN RUST BAĞIMLILIKLARINI OKU
+    let lock_path = Path::new(&manifest_dir).join("Cargo.lock");
+    if let Ok(lock_content) = fs::read_to_string(&lock_path) {
         println!("cargo:rustc-env=SDK_VERSION={}", extract_version(&lock_content, "sentiric-telecom-client-sdk"));
         println!("cargo:rustc-env=SIP_CORE_VERSION={}", extract_version(&lock_content, "sentiric-sip-core"));
         println!("cargo:rustc-env=RTP_CORE_VERSION={}", extract_version(&lock_content, "sentiric-rtp-core"));
@@ -26,8 +26,22 @@ fn main() {
         println!("cargo:rustc-env=RTP_CORE_VERSION=Unknown");
     }
 
-    // Cargo.lock değiştiğinde build.rs yeniden çalışsın
+    // 2. PUBSPEC.YAML İÇİNDEN FLUTTER APP VERSİYONUNU OKU
+    let pubspec_path = Path::new(&manifest_dir).join("../pubspec.yaml");
+    if let Ok(pubspec_content) = fs::read_to_string(&pubspec_path) {
+        let flutter_ver = pubspec_content.lines()
+            .find(|line| line.starts_with("version:"))
+            .and_then(|line| line.split(':').nth(1))
+            .map(|s| s.trim())
+            .unwrap_or("Unknown");
+        println!("cargo:rustc-env=FLUTTER_APP_VERSION={}", flutter_ver);
+    } else {
+        println!("cargo:rustc-env=FLUTTER_APP_VERSION=Unknown");
+    }
+
+    // Dosyalar değiştiğinde build.rs yeniden çalışsın
     println!("cargo:rerun-if-changed=Cargo.lock");
+    println!("cargo:rerun-if-changed=../pubspec.yaml");
 }
 
 // Cargo.lock içinden belirtilen paketin tam versiyonunu ayıklayan yardımcı fonksiyon
