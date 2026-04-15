@@ -65,6 +65,12 @@ pub async fn start_engine(sink: StreamSink<String>) -> anyhow::Result<()> {
 
     let stream_sink = sink.clone();
 
+    // [YENİ]: SDK ve Core versiyonlarını Debug Console'a bas
+    let _ = stream_sink.add(format!(
+        "Log(\"🚀 Booting Sentiric Engine (Native v{} | SDK v0.4.15 | SIP v1.5.6 | RTP v1.6.2)\")",
+        env!("CARGO_PKG_VERSION")
+    ));    
+
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             let msg = format!("{:?}", event);

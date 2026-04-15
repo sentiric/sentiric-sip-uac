@@ -14,35 +14,50 @@ class ProfilesScreen extends StatelessWidget {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(title: const Text("SIP PROFILES", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2.0)), backgroundColor: Colors.transparent),
-          body: ListView.builder(
-            itemCount: controller.profiles.length,
-            itemBuilder: (context, index) {
-              final p = controller.profiles[index];
-              final isActive = controller.activeProfile?.id == p.id;
-              return ListTile(
-                leading: Icon(p.isTrunk ? Icons.dns : Icons.person, color: isActive ? const Color(0xFF00FF9D) : Colors.white54),
-                title: Text(p.name, style: TextStyle(color: isActive ? const Color(0xFF00FF9D) : Colors.white)),
-                subtitle: Text(p.isTrunk ? "Trunk Target: ${p.ip}:${p.port}" : "Account: ${p.user}@${p.ip}:${p.port}"),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children:[
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                      onPressed: () => _showAddProfile(context, existingProfile: p),
-                    ),
-                    if (!isActive) IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.white24),
-                      onPressed: () { controller.profiles.removeAt(index); controller.saveState(); },
-                    ),
-                    if (isActive) const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Icon(Icons.check_circle, color: Color(0xFF00FF9D)),
-                    ),
-                  ],
+          body: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: controller.profiles.length,
+                  itemBuilder: (context, index) {
+                    final p = controller.profiles[index];
+                    final isActive = controller.activeProfile?.id == p.id;
+                    return ListTile(
+                      leading: Icon(p.isTrunk ? Icons.dns : Icons.person, color: isActive ? const Color(0xFF00FF9D) : Colors.white54),
+                      title: Text(p.name, style: TextStyle(color: isActive ? const Color(0xFF00FF9D) : Colors.white)),
+                      subtitle: Text(p.isTrunk ? "Trunk Target: ${p.ip}:${p.port}" : "Account: ${p.user}@${p.ip}:${p.port}"),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children:[
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                            onPressed: () => _showAddProfile(context, existingProfile: p),
+                          ),
+                          if (!isActive) IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.white24),
+                            onPressed: () { controller.profiles.removeAt(index); controller.saveState(); },
+                          ),
+                          if (isActive) const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12.0),
+                            child: Icon(Icons.check_circle, color: Color(0xFF00FF9D)),
+                          ),
+                        ],
+                      ),
+                      onTap: () => controller.loadProfile(p),
+                    );
+                  },
                 ),
-                onTap: () => controller.loadProfile(p),
-              );
-            },
+              ),
+              // [YENİ]: VERSİYON GÖSTERGESİ (FOOTER)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  "Sentiric UAC v1.8.7\nTelecom SDK v0.4.15 • SIP Core v1.5.6 • RTP Core v1.6.2",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.0, height: 1.5),
+                ),
+              ),
+            ],
           ),
           floatingActionButton: FloatingActionButton(
             backgroundColor: const Color(0xFF00FF9D),
