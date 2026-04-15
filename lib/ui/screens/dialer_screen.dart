@@ -43,6 +43,81 @@ class DialerScreen extends StatelessWidget {
     );
   }
 
+  // [UX FIX] Canlı Ses Ayarları Menüsü
+  void _showAudioSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF111111),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              height: 350,
+              child: Column(
+                children: [
+                  const Text("AUDIO GAIN & AEC", style: TextStyle(color: Color(0xFF00FF9D), letterSpacing: 2.0, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const Icon(Icons.mic, color: Colors.white54),
+                      const SizedBox(width: 10),
+                      const Text("Mic Gain", style: TextStyle(color: Colors.white)),
+                      Expanded(
+                        child: Slider(
+                          value: controller.micGain,
+                          min: 0.0,
+                          max: 3.0,
+                          activeColor: const Color(0xFF00FF9D),
+                          onChanged: (val) {
+                            setState(() => controller.micGain = val);
+                            controller.updateAudioParams(controller.micGain, controller.speakerGain, controller.enableAec);
+                          }
+                        ),
+                      ),
+                      Text(controller.micGain.toStringAsFixed(1), style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.volume_up, color: Colors.white54),
+                      const SizedBox(width: 10),
+                      const Text("Speaker Gain", style: TextStyle(color: Colors.white)),
+                      Expanded(
+                        child: Slider(
+                          value: controller.speakerGain,
+                          min: 0.0,
+                          max: 3.0,
+                          activeColor: const Color(0xFF00FF9D),
+                          onChanged: (val) {
+                            setState(() => controller.speakerGain = val);
+                            controller.updateAudioParams(controller.micGain, controller.speakerGain, controller.enableAec);
+                          }
+                        ),
+                      ),
+                      Text(controller.speakerGain.toStringAsFixed(1), style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                  SwitchListTile(
+                    title: const Text("Acoustic Echo Cancellation", style: TextStyle(color: Colors.white, fontSize: 14)),
+                    subtitle: const Text("Donanımsal yankı engelleyiciyi tetikler.", style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    value: controller.enableAec,
+                    activeColor: const Color(0xFF00FF9D),
+                    onChanged: (val) {
+                      setState(() => controller.enableAec = val);
+                      controller.updateAudioParams(controller.micGain, controller.speakerGain, controller.enableAec);
+                    }
+                  )
+                ]
+              )
+            );
+          }
+        );
+      }
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -94,7 +169,6 @@ class DialerScreen extends StatelessWidget {
               children:[
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 20),
-                  // [UX FIX] ValueListenableBuilder ile setState darboğazı kaldırıldı.
                   child: ValueListenableBuilder<String>(
                     valueListenable: controller.dialedNumber,
                     builder: (context, number, _) {
@@ -193,10 +267,12 @@ class DialerScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children:[
               _actionBtn(Icons.mic_off, "MUTE", controller.isMuted, controller.toggleMute),
-              const SizedBox(width: 30),
+              const SizedBox(width: 20),
               _actionBtn(Icons.dialpad, "KEYPAD", false, () => _showDtmfPad(context)),
-              const SizedBox(width: 30),
+              const SizedBox(width: 20),
               _actionBtn(controller.isSpeakerOn ? Icons.volume_up : Icons.phone_in_talk, "SPEAKER", controller.isSpeakerOn, controller.toggleSpeaker),
+              const SizedBox(width: 20),
+              _actionBtn(Icons.tune, "AUDIO", false, () => _showAudioSettings(context)), // [UX FIX] Yeni Ayarlar
             ],
           ),
           const SizedBox(height: 40),

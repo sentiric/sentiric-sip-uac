@@ -21,7 +21,6 @@ class CallController extends ChangeNotifier {
   List<PhoneContact> get activeContacts => _allContacts.where((c) => c.profileId == activeProfile?.id).toList();
   List<CallRecord> get activeHistory => _allHistory.where((h) => h.profileId == activeProfile?.id).toList();
 
-  // [UX FIX] Zero-latency dialpad için ValueNotifier yapısı.
   final ValueNotifier<String> dialedNumber = ValueNotifier<String>("");
   
   final List<TelemetryEntry> telemetryLogs =[];
@@ -33,6 +32,11 @@ class CallController extends ChangeNotifier {
   bool isSpeakerOn = false;
   bool isMuted = false;
   bool _isEngineStarted = false;
+
+  // [UX FIX] Dinamik Gain ve AEC Yönetimi
+  double micGain = 1.0;
+  double speakerGain = 1.0;
+  bool enableAec = true;
   
   int rxPackets = 0;
   int txPackets = 0;
@@ -44,10 +48,8 @@ class CallController extends ChangeNotifier {
   bool isIncomingCall = false;
   Timer? _durationTimer;
 
-  // [UX FIX] Başka bir sekmeden çağrı geldiğinde ana sekmeye yönlendirme Callback'i
   VoidCallback? onNavigateToDialer;
 
-  // [UX FIX] FRB Event Throttler
   bool _updateScheduled = false;
   void _scheduleUiUpdate() {
     if (!_updateScheduled) {
@@ -174,10 +176,10 @@ class CallController extends ChangeNotifier {
       HapticFeedback.heavyImpact();
       Future.delayed(const Duration(seconds: 1), () { if(sipStatus == "INCOMING CALL") HapticFeedback.heavyImpact(); });
       
-      onNavigateToDialer?.call(); // [UX FIX] Çağrı gelince ekranı aktifleştir
+      onNavigateToDialer?.call();
       
       _addLog(TelemetryEntry(message: "🔔 Incoming call from: $incomingCaller", level: TelemetryLevel.status));
-      notifyListeners(); // Hızlı tepki için anında render.
+      notifyListeners();
       return;
     }
 
@@ -191,7 +193,7 @@ class CallController extends ChangeNotifier {
       
       if (sipStatus == "CONNECTED") {
         _startDurationTimer();
-        notifyListeners(); // Acil UI güncellemesi
+        notifyListeners();
       } else if (sipStatus == "TERMINATED" || sipStatus == "IDLE" || sipStatus == "AUTHFAILED") {
         
         if (isCalling && currentCallTarget.isNotEmpty && activeProfile != null) {
@@ -220,7 +222,6 @@ class CallController extends ChangeNotifier {
       _addLog(entry);
     }
     
-    // [UX FIX] Sürekli güncellenen statüler için Throttle 
     _scheduleUiUpdate();
   }
 
@@ -268,8 +269,9 @@ class CallController extends ChangeNotifier {
     currentCallTarget = targetNumber;
     isIncomingCall = false;
     isSpeakerOn = false;
+    speakerGain = 1.0; // Reset
     
-    onNavigateToDialer?.call(); // [UX FIX] Rehberden aranırsa ana ekrana at.
+    onNavigateToDialer?.call();
     
     try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('setInCallMode'); } catch (e) {}
 
@@ -299,7 +301,37 @@ class CallController extends ChangeNotifier {
 
   Future<void> rejectCall() async { try { await rejectInboundCall(); } catch (e) {} }
   Future<void> endCall() async { try { await endSipCall(); } catch (e) {} }
-  Future<void> toggleSpeaker() async { isSpeakerOn = !isSpeakerOn; notifyListeners(); try { if (Platform.isAndroid || Platform.isIOS) await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn}); } catch (e) {} }
+  
+  // [UX FIX] Audio Params Sync
+  void updateAudioParams(double mGain, double sGain, bool aec) {
+    micGain = mGain;
+    speakerGain = sGain;
+    enableAec = aec;
+    notifyListeners();
+    updateAudioSettings(micGain: micGain, speakerGain: speakerGain, enableAec: enableAec);
+    _processEvent("Log(\"🎛️ Audio Params -> Mic: $micGain, Spk: $speakerGain, AEC: $enableAec\")");
+  }
+
+  Future<void> toggleSpeaker() async { 
+    isSpeakerOn = !isSpeakerOn; 
+    
+    // [UX FIX] Hoparlöre geçince AEC'yi etkinleştir ve sesi yükselt
+    if (isSpeakerOn) {
+      enableAec = true;
+      speakerGain = 1.2;
+    } else {
+      speakerGain = 1.0;
+    }
+    
+    notifyListeners(); 
+    try { 
+      if (Platform.isAndroid || Platform.isIOS) {
+        await platform.invokeMethod('toggleSpeaker', {'speakerOn': isSpeakerOn}); 
+      }
+      await updateAudioSettings(micGain: micGain, speakerGain: speakerGain, enableAec: enableAec);
+    } catch (e) {} 
+  }
+  
   void toggleMute() { isMuted = !isMuted; setMute(muted: isMuted); notifyListeners(); }
   void sendDtmf(String key) { sendSipDtmf(key: key); _processEvent("Log(\"🎹 Sent DTMF: $key\")"); }
 }
